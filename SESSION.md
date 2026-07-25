@@ -2,10 +2,7 @@
 
 If you need to continue this development session on another PC, open opencode and share this link:
 
-<!-- PASTE YOUR CONVERSATION LINK HERE -->
-<!-- Example: https://opencode.ai/s/xxxxxxxx -->
-
-**Link:** _Add your opencode conversation link here_
+**Link:** https://opncd.ai/share/a8LeCjC2
 
 ## Session Summary
 
