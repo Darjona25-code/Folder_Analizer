@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Folder Analyzer - Caza Bytes</title>
+    <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+    <!-- SPLASH SCREEN -->
+    <div class="splash" id="splash">
+        <img src="/assets/CazaBytes.png" alt="Caza Bytes" class="splash-logo">
+        <div class="splash-title">Folder Analyzer</div>
+        <div class="splash-subtitle">by Caza Bytes</div>
+        <div class="splash-spinner"></div>
+    </div>
+
+    <!-- LOADING OVERLAY -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loadingText">Loading...</div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- CONFIRM MODAL -->
+    <div class="modal-overlay" id="confirmModal">
+        <div class="modal">
+            <div class="modal-title">Confirm Deletion</div>
+            <div class="modal-body" id="confirmModalBody"></div>
+            <div class="modal-actions">
+                <button class="btn btn-export" onclick="closeModal('confirmModal')">Cancel</button>
+                <button class="btn btn-danger" id="confirmDeleteBtn">Send to Recycle Bin</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HEADER -->
+    <header class="header">
+        <img src="/assets/CazaBytes.png" alt="Caza Bytes" class="header-logo">
+        <div class="header-info">
+            <div class="header-title">Folder Analyzer</div>
+            <div class="header-subtitle">by Caza Bytes</div>
+        </div>
+        <div class="header-stats">
+            <div class="stat-item">
+                <div class="stat-label">Total</div>
+                <div class="stat-value" id="diskTotal">--</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Used</div>
+                <div class="stat-value" id="diskUsed">--</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Free</div>
+                <div class="stat-value" id="diskFree">--</div>
+            </div>
+            <div class="disk-bar">
+                <div class="disk-bar-fill" id="diskBarFill" style="width: 0%"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <div class="container">
+
+        <!-- SCAN BAR -->
+        <div class="scan-bar">
+            <input type="text" class="scan-input" id="scanInput" placeholder="Enter path to scan (e.g. C:\ or D:\Games)">
+            <button class="btn btn-primary" id="scanBtn">&#128269; Scan</button>
+            <div class="dropdown">
+                <button class="btn btn-export" id="exportBtn">&#128229; Export</button>
+                <div class="dropdown-menu" id="exportMenu">
+                    <button class="dropdown-item" onclick="exportAs('json')">&#128196; JSON</button>
+                    <button class="dropdown-item" onclick="exportAs('csv')">&#128202; CSV</button>
+                    <button class="dropdown-item" onclick="exportAs('html')">&#127760; HTML</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TABLE -->
+        <div class="table-container">
+            <div class="table-header">
+                <div class="table-title">Disk Usage Analysis</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 50px">#</th>
+                        <th data-sort="name">Folder</th>
+                        <th data-sort="total_size" style="width: 130px; text-align: right">Size</th>
+                        <th data-sort="risk" style="width: 130px; text-align: center">Risk</th>
+                        <th data-sort="file_count" style="width: 100px; text-align: right">Files</th>
+                        <th style="width: 130px; text-align: center">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="folderTableBody">
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted)">
+                            Enter a path above and click Scan to analyze disk usage.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- TREEMAP -->
+        <div class="treemap-container">
+            <div class="treemap-title">Disk Usage Distribution</div>
+            <div id="treemapContent">
+                <p style="color: var(--text-muted)">Run a scan to see the disk usage treemap.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>
