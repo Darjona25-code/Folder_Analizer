@@ -11,6 +11,7 @@ class RiskLevel(Enum):
 
 
 CRITICAL_FOLDERS = {
+    "C:\\Windows",
     "C:\\Windows\\WinSxS",
     "C:\\Windows\\System32",
     "C:\\Windows\\SysWOW64",
@@ -18,17 +19,36 @@ CRITICAL_FOLDERS = {
     "C:\\Windows\\servicing",
     "C:\\Windows\\Installer",
     "C:\\Windows\\WinSxS\\Backup",
+    "C:\\Windows\\Fonts",
+    "C:\\Windows\\System",
+    "C:\\Windows\\System Resources",
+    "C:\\Windows\\INF",
+    "C:\\Windows\\Registration",
+    "C:\\Program Files",
+    "C:\\Program Files (x86)",
+    "C:\\Program Files\\Common Files",
+    "C:\\Program Files\\Internet Explorer",
+    "C:\\Program Files\\Windows Defender",
+    "C:\\Program Files\\Windows Mail",
+    "C:\\Program Files\\Windows Media Player",
+    "C:\\Program Files\\Windows NT",
+    "C:\\Program Files\\Windows Photo Viewer",
+    "C:\\Program Files\\Windows Portable Devices",
+    "C:\\Program Files\\Windows Sidebar",
+    "C:\\Program Files\\WindowsPowerShell",
+    "C:\\Program Files (x86)\\Common Files",
     "C:\\ProgramData\\Microsoft\\Windows",
+    "C:\\ProgramData\\Microsoft\\Windows\\Start Menu",
     "C:\\Recovery",
     "C:\\$Recycle.Bin",
     "C:\\System Volume Information",
+    "C:\\pagefile.sys",
+    "C:\\swapfile.sys",
+    "C:\\hiberfil.sys",
 }
 
 CAUTION_FOLDERS = {
-    "C:\\Program Files",
-    "C:\\Program Files (x86)",
     "C:\\ProgramData",
-    "C:\\Windows",
     "C:\\Users",
 }
 
@@ -38,8 +58,11 @@ CAUTION_EXTENSIONS = {
 
 SYSTEM_SUBPATHS = [
     "\\System32", "\\SysWOW64", "\\WinSxS", "\\Boot", "\\servicing",
-    "\\Installer", "\\DriverStore",
+    "\\Installer", "\\DriverStore", "\\Fonts", "\\INF",
+    "\\Registration", "\\System", "\\System Resources",
 ]
+
+PROTECTED_DRIVES = {"C:"}
 
 
 def get_risk_level(path: str) -> RiskLevel:
@@ -77,6 +100,8 @@ def _is_program_folder(path: str) -> bool:
         return False
     if "\\MUSIC" in upper or "\\APPDATA\\LOCAL" in upper:
         return False
+    if "\\DESKTOP\\FOLDERS" in upper or "\\MY DOCUMENTS" in upper:
+        return False
     return True
 
 
@@ -84,11 +109,23 @@ def is_deletable(path: str) -> bool:
     return get_risk_level(path) != RiskLevel.CRITICAL
 
 
+def is_protected(path: str) -> bool:
+    return get_risk_level(path) in (RiskLevel.CRITICAL, RiskLevel.CAUTION)
+
+
 def get_risk_color(level: RiskLevel) -> str:
     return {
         RiskLevel.CRITICAL: "red",
         RiskLevel.CAUTION: "yellow",
         RiskLevel.SAFE: "green",
+    }[level]
+
+
+def get_risk_hex(level: RiskLevel) -> str:
+    return {
+        RiskLevel.CRITICAL: "#f85149",
+        RiskLevel.CAUTION: "#d29922",
+        RiskLevel.SAFE: "#3fb950",
     }[level]
 
 

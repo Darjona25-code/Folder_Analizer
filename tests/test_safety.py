@@ -13,8 +13,28 @@ def test_critical_winsxs():
     assert risk == RiskLevel.CRITICAL
 
 
-def test_caution_program_files():
+def test_critical_program_files():
     risk = get_risk_level("C:\\Program Files")
+    assert risk == RiskLevel.CRITICAL
+
+
+def test_critical_program_files_x86():
+    risk = get_risk_level("C:\\Program Files (x86)")
+    assert risk == RiskLevel.CRITICAL
+
+
+def test_critical_windows():
+    risk = get_risk_level("C:\\Windows")
+    assert risk == RiskLevel.CRITICAL
+
+
+def test_critical_windows_fonts():
+    risk = get_risk_level("C:\\Windows\\Fonts")
+    assert risk == RiskLevel.CRITICAL
+
+
+def test_caution_programdata():
+    risk = get_risk_level("C:\\ProgramData")
     assert risk == RiskLevel.CAUTION
 
 
