@@ -16,7 +16,7 @@ from folder_analyzer.exporter import export_json, export_csv, export_html
 from folder_analyzer.i18n import I18n
 
 from .models import (
-    ScanRequest, ScanResponse, ScanStats, FolderDict,
+    ScanRequest, ScanResponse, ScanStats, FolderDict, FolderDetailResponse,
     DeleteRequest, DeleteResponse, DeleteResult,
     ExportRequest, DiskInfo,
 )
@@ -24,6 +24,22 @@ from .models import (
 router = APIRouter()
 
 _last_scan_root = None
+
+
+def _find_folder_by_path(folder, target_path: str):
+    """Recursively find a FolderInfo node by path in the scan tree."""
+    normalized_target = os.path.normpath(target_path).upper()
+    normalized_current = os.path.normpath(folder.path).upper()
+
+    if normalized_current == normalized_target:
+        return folder
+
+    for child in folder.children:
+        result = _find_folder_by_path(child, target_path)
+        if result is not None:
+            return result
+
+    return None
 
 
 def _folder_to_dict(folder) -> FolderDict:
@@ -80,6 +96,31 @@ def get_folders(limit: int = 50):
 
     top = sort_folders_by_size(_last_scan_root, top_n=limit)
     return [_folder_to_dict(f) for f in top]
+
+
+@router.get("/api/folder/detail", response_model=FolderDetailResponse)
+def get_folder_detail(path: str):
+    global _last_scan_root
+    if _last_scan_root is None:
+        raise HTTPException(status_code=400, detail="No scan performed yet. POST /api/scan first.")
+
+    folder = _find_folder_by_path(_last_scan_root, path)
+    if folder is None:
+        raise HTTPException(status_code=404, detail=f"Folder not found in scan tree: {path}")
+
+    children = [_folder_to_dict(c) for c in folder.children]
+
+    safe_count = sum(1 for c in children if c.risk == "safe")
+    caution_count = sum(1 for c in children if c.risk == "caution")
+    critical_count = sum(1 for c in children if c.risk == "critical")
+
+    return FolderDetailResponse(
+        folder=_folder_to_dict(folder),
+        children=children,
+        safe_count=safe_count,
+        caution_count=caution_count,
+        critical_count=critical_count,
+    )
 
 
 @router.post("/api/delete", response_model=DeleteResponse)

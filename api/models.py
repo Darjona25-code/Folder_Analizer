@@ -55,6 +55,14 @@ class ExportRequest(BaseModel):
     format: str
 
 
+class FolderDetailResponse(BaseModel):
+    folder: FolderDict
+    children: list[FolderDict]
+    safe_count: int
+    caution_count: int
+    critical_count: int
+
+
 class DiskInfo(BaseModel):
     total: int
     used: int

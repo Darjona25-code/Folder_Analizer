@@ -1,10 +1,12 @@
-/* Folder Analyzer v2.0 - Frontend Logic */
+/* Folder Analyzer v3.0 - Frontend Logic */
 
 const API_BASE = '';
 
 let currentData = null;
 let sortColumn = 'total_size';
 let sortDir = 'desc';
+let expandedRows = new Set();
+let expandedChildren = {};
 
 /* ======================== INIT ======================== */
 
@@ -76,6 +78,9 @@ async function startScan() {
         return;
     }
 
+    expandedRows.clear();
+    expandedChildren = {};
+
     showLoading('Scanning ' + path + '...');
 
     try {
@@ -97,6 +102,54 @@ async function startScan() {
         showToast('Scan error: ' + err.message, 'error');
     } finally {
         hideLoading();
+    }
+}
+
+async function loadFolderDetail(path, rowElement, level) {
+    if (expandedChildren[path]) {
+        collapseRow(path);
+        return;
+    }
+
+    const arrow = rowElement.querySelector('.expand-arrow');
+    if (arrow) arrow.classList.add('expanded');
+
+    try {
+        const res = await fetch(`${API_BASE}/api/folder/detail?path=${encodeURIComponent(path)}`);
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Failed to load folder details');
+        }
+
+        const data = await res.json();
+        expandedChildren[path] = data.children;
+        expandedRows.add(path);
+
+        renderChildRows(rowElement, data.children, level);
+    } catch (err) {
+        showToast('Error loading folder details: ' + err.message, 'error');
+    }
+}
+
+function collapseRow(path) {
+    const children = expandedChildren[path];
+    if (!children) return;
+
+    delete expandedChildren[path];
+    expandedRows.delete(path);
+
+    document.querySelectorAll(`[data-parent="${CSS.escape(path)}"]`).forEach(row => {
+        const childPath = row.dataset.path;
+        if (expandedRows.has(childPath)) {
+            collapseRow(childPath);
+        }
+        row.remove();
+    });
+
+    const parentRow = document.querySelector(`tr[data-path="${CSS.escape(path)}"]`);
+    if (parentRow) {
+        const arrow = parentRow.querySelector('.expand-arrow');
+        if (arrow) arrow.classList.remove('expanded');
     }
 }
 
@@ -123,6 +176,9 @@ async function deleteFolders(paths) {
 
         if (result.total_deleted > 0) {
             showToast(`${result.total_deleted} folder(s) sent to Recycle Bin.`, 'success');
+
+            expandedRows.clear();
+            expandedChildren = {};
             await startScan();
         }
     } catch (err) {
@@ -207,32 +263,129 @@ function renderTable(folders) {
         return va < vb ? 1 : -1;
     });
 
-    tbody.innerHTML = sorted.map((folder, idx) => {
-        const riskClass = `risk-${folder.risk}`;
-        const riskLabel = folder.risk.toUpperCase();
-        const lockIcon = folder.risk === 'critical' ? ' &#128274;' : '';
-        const cautionIcon = folder.risk === 'caution' ? ' &#9888;' : '';
-
-        let actionBtn;
-        if (!folder.deletable) {
-            actionBtn = `<button class="btn btn-danger" disabled title="System folder - cannot be deleted">&#128274;</button>`;
-        } else if (folder.risk === 'caution') {
-            actionBtn = `<button class="btn btn-warning" onclick="confirmDelete('${escapeHtml(folder.path)}')">&#9888; Delete</button>`;
-        } else {
-            actionBtn = `<button class="btn btn-danger" onclick="confirmDelete('${escapeHtml(folder.path)}')">&#128465; Delete</button>`;
+    let html = '';
+    sorted.forEach((folder, idx) => {
+        html += renderMainRow(folder, idx);
+        if (expandedRows.has(folder.path) && expandedChildren[folder.path]) {
+            expandedChildren[folder.path].forEach((child, cIdx) => {
+                html += renderChildRow(child, folder.path, 1, cIdx);
+            });
         }
+    });
 
-        return `
-            <tr>
-                <td>${idx + 1}</td>
-                <td class="path" title="${escapeHtml(folder.path)}">${escapeHtml(folder.name)}</td>
-                <td class="size">${formatSize(folder.total_size)}</td>
-                <td><span class="risk-badge ${riskClass}">${riskLabel}${lockIcon}${cautionIcon}</span></td>
-                <td class="files">${folder.file_count.toLocaleString()}</td>
-                <td>${actionBtn}</td>
-            </tr>
-        `;
-    }).join('');
+    tbody.innerHTML = html;
+}
+
+function renderMainRow(folder, idx) {
+    const riskClass = `risk-${folder.risk}`;
+    const riskLabel = folder.risk.toUpperCase();
+    const isExpanded = expandedRows.has(folder.path);
+    const hasChildren = folder.children && folder.children.length > 0;
+    const canExpand = hasChildren || folder.folder_count > 0;
+
+    let arrowHtml = '';
+    if (canExpand) {
+        arrowHtml = `<td><div class="expand-arrow ${isExpanded ? 'expanded' : ''}" onclick="toggleExpand(this, '${escapeAttr(folder.path)}', 0)">&#9654;</div></td>`;
+    } else {
+        arrowHtml = '<td></td>';
+    }
+
+    let actionBtn;
+    if (!folder.deletable) {
+        actionBtn = `<button class="btn btn-danger" disabled title="System folder - protected">&#128274; Locked</button>`;
+    } else if (folder.risk === 'caution') {
+        actionBtn = `<button class="btn btn-warning" onclick="confirmDelete('${escapeAttr(folder.path)}')">&#9888; Delete</button>`;
+    } else {
+        actionBtn = `<button class="btn btn-danger" onclick="confirmDelete('${escapeAttr(folder.path)}')">&#128465; Delete</button>`;
+    }
+
+    let riskDetail = '';
+    if (folder.risk === 'critical') {
+        riskDetail = '<div class="delete-label system">System - Protected</div>';
+    } else if (folder.risk === 'caution') {
+        riskDetail = '<div class="delete-label protected">Program - Protected</div>';
+    } else {
+        riskDetail = '<div class="delete-label safe">Safe to delete</div>';
+    }
+
+    return `
+        <tr class="row-expandable" data-path="${escapeAttr(folder.path)}">
+            ${arrowHtml}
+            <td>${idx + 1}</td>
+            <td class="path" title="${escapeAttr(folder.path)}">${escapeHtml(folder.name)}</td>
+            <td class="size">${formatSize(folder.total_size)}</td>
+            <td>
+                <span class="risk-badge ${riskClass}">${riskLabel}</span>
+                ${riskDetail}
+            </td>
+            <td class="files">${folder.file_count.toLocaleString()}</td>
+            <td>${actionBtn}</td>
+        </tr>
+    `;
+}
+
+function renderChildRow(child, parentPath, level, idx) {
+    const riskClass = `risk-${child.risk}`;
+    const riskLabel = child.risk.toUpperCase();
+    const isExpanded = expandedRows.has(child.path);
+    const hasChildren = child.children && child.children.length > 0;
+    const canExpand = hasChildren || child.folder_count > 0;
+
+    const indent = level * 32;
+
+    let arrowHtml = '';
+    if (canExpand) {
+        arrowHtml = `<td><div class="expand-arrow ${isExpanded ? 'expanded' : ''}" onclick="toggleExpand(this, '${escapeAttr(child.path)}', ${level})">&#9654;</div></td>`;
+    } else {
+        arrowHtml = '<td></td>';
+    }
+
+    let actionBtn;
+    if (!child.deletable) {
+        actionBtn = `<button class="btn btn-danger" disabled title="System folder - protected">&#128274;</button>`;
+    } else if (child.risk === 'caution') {
+        actionBtn = `<button class="btn btn-warning" onclick="confirmDelete('${escapeAttr(child.path)}')">&#9888;</button>`;
+    } else {
+        actionBtn = `<button class="btn btn-danger" onclick="confirmDelete('${escapeAttr(child.path)}')">&#128465;</button>`;
+    }
+
+    return `
+        <tr class="row-child level-${level}" data-path="${escapeAttr(child.path)}" data-parent="${escapeAttr(parentPath)}">
+            ${arrowHtml}
+            <td></td>
+            <td class="path" title="${escapeAttr(child.path)}" style="padding-left: ${indent}px">
+                <span class="tree-prefix">${level < 3 ? '├─' : '└─'}</span>${escapeHtml(child.name)}
+            </td>
+            <td class="size">${formatSize(child.total_size)}</td>
+            <td><span class="risk-badge ${riskClass}">${riskLabel}</span></td>
+            <td class="files">${child.file_count.toLocaleString()}</td>
+            <td>${actionBtn}</td>
+        </tr>
+    `;
+}
+
+function renderChildRows(parentRow, children, level) {
+    const parentPath = parentRow.dataset.path;
+    const nextSibling = parentRow.nextElementSibling;
+    const fragment = document.createDocumentFragment();
+    const temp = document.createElement('tbody');
+
+    children.forEach((child, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = renderChildRow(child, parentPath, level + 1, idx).replace(/^<tr[^>]*>|<\/tr>$/g, '');
+        tr.className = `row-child level-${level + 1}`;
+        tr.dataset.path = child.path;
+        tr.dataset.parent = parentPath;
+        temp.appendChild(tr);
+    });
+
+    while (temp.firstChild) {
+        if (nextSibling) {
+            parentRow.parentNode.insertBefore(temp.firstChild, nextSibling);
+        } else {
+            parentRow.parentNode.appendChild(temp.firstChild);
+        }
+    }
 }
 
 function renderTreemap(folders) {
@@ -255,7 +408,7 @@ function renderTreemap(folders) {
 
         return `
             <div class="treemap-bar-row">
-                <div class="treemap-bar-label" title="${escapeHtml(folder.path)}">${escapeHtml(name)}</div>
+                <div class="treemap-bar-label" title="${escapeAttr(folder.path)}">${escapeHtml(name)}</div>
                 <div class="treemap-bar-track">
                     <div class="treemap-bar-fill ${folder.risk}" style="width: ${Math.max(barWidth, 2)}%">
                         ${barWidth > 15 ? `${pct}%` : ''}
@@ -268,6 +421,17 @@ function renderTreemap(folders) {
 }
 
 /* ======================== ACTIONS ======================== */
+
+async function toggleExpand(arrow, path, level) {
+    const row = arrow.closest('tr');
+    if (!row) return;
+
+    if (expandedRows.has(path)) {
+        collapseRow(path);
+    } else {
+        await loadFolderDetail(path, row, level);
+    }
+}
 
 function confirmDelete(path) {
     const modal = document.getElementById('confirmModal');
@@ -319,6 +483,11 @@ function formatSize(bytes) {
 function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function escapeAttr(str) {
+    if (!str) return '';
+    return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
 }
 
 function showLoading(text) {

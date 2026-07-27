@@ -340,6 +340,90 @@ td.files {
     color: var(--text-secondary);
 }
 
+/* EXPANDABLE ROWS */
+.expand-arrow {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+    color: var(--text-muted);
+    font-size: 12px;
+    user-select: none;
+}
+
+.expand-arrow:hover {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.expand-arrow.expanded {
+    transform: rotate(90deg);
+    color: var(--accent);
+}
+
+.row-expandable {
+    cursor: pointer;
+}
+
+.row-expandable:hover {
+    background: var(--bg-table-row-hover) !important;
+}
+
+.row-child {
+    background: var(--bg-table-row) !important;
+}
+
+.row-child td:first-child {
+    border-left: none;
+}
+
+.row-child.level-1 td.path {
+    padding-left: 40px;
+}
+
+.row-child.level-2 td.path {
+    padding-left: 72px;
+}
+
+.row-child.level-3 td.path {
+    padding-left: 104px;
+}
+
+.tree-prefix {
+    color: var(--text-muted);
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 12px;
+    margin-right: 4px;
+}
+
+.row-child .risk-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+}
+
+/* SAFE DELETE INDICATORS */
+.delete-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.delete-label.safe {
+    color: var(--safe);
+}
+
+.delete-label.protected {
+    color: var(--caution);
+}
+
+.delete-label.system {
+    color: var(--critical);
+}
+
 /* RISK BADGE */
 .risk-badge {
     display: inline-flex;
