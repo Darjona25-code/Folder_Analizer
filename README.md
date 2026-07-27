@@ -31,10 +31,6 @@ Open `http://localhost:8000` in your browser.
 ## Building the .exe
 
 ```bash
-# Option 1: Use the batch file (double-click)
-build.bat
-
-# Option 2: Use Python directly
 python build.py              # One-folder mode (recommended)
 python build.py --onefile    # Single .exe (larger but simpler)
 python build.py --clean      # Clean build artifacts first
@@ -77,7 +73,6 @@ Folder_Analizer/
 │   ├── test_safety.py     # Safety system tests
 │   └── test_i18n.py       # Translation tests
 ├── build.py               # PyInstaller build script
-├── build.bat              # Windows build wrapper
 ├── requirements.txt
 ├── pyproject.toml
 └── README.md
