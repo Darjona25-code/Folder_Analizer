@@ -285,7 +285,7 @@ function renderMainRow(folder, idx) {
 
     let arrowHtml = '';
     if (canExpand) {
-        arrowHtml = `<td><div class="expand-arrow ${isExpanded ? 'expanded' : ''}" onclick="toggleExpand(this, '${escapeAttr(folder.path)}', 0)">&#9654;</div></td>`;
+        arrowHtml = `<td><div class="expand-arrow ${isExpanded ? 'expanded' : ''}" onclick="toggleExpand(this, '${escapeJsStr(folder.path)}', 0)">&#9654;</div></td>`;
     } else {
         arrowHtml = '<td></td>';
     }
@@ -294,9 +294,9 @@ function renderMainRow(folder, idx) {
     if (!folder.deletable) {
         actionBtn = `<button class="btn btn-danger" disabled title="System folder - protected">&#128274; Locked</button>`;
     } else if (folder.risk === 'caution') {
-        actionBtn = `<button class="btn btn-warning" onclick="confirmDelete('${escapeAttr(folder.path)}')">&#9888; Delete</button>`;
+        actionBtn = `<button class="btn btn-warning" onclick="confirmDelete('${escapeJsStr(folder.path)}')">&#9888; Delete</button>`;
     } else {
-        actionBtn = `<button class="btn btn-danger" onclick="confirmDelete('${escapeAttr(folder.path)}')">&#128465; Delete</button>`;
+        actionBtn = `<button class="btn btn-danger" onclick="confirmDelete('${escapeJsStr(folder.path)}')">&#128465; Delete</button>`;
     }
 
     let riskDetail = '';
@@ -309,10 +309,10 @@ function renderMainRow(folder, idx) {
     }
 
     return `
-        <tr class="row-expandable" data-path="${escapeAttr(folder.path)}">
+        <tr class="row-expandable" data-path="${escapeHtmlAttr(folder.path)}">
             ${arrowHtml}
             <td>${idx + 1}</td>
-            <td class="path" title="${escapeAttr(folder.path)}">${escapeHtml(folder.name)}</td>
+            <td class="path" title="${escapeHtmlAttr(folder.path)}">${escapeHtml(folder.name)}</td>
             <td class="size">${formatSize(folder.total_size)}</td>
             <td>
                 <span class="risk-badge ${riskClass}">${riskLabel}</span>
@@ -335,7 +335,7 @@ function renderChildRow(child, parentPath, level, idx) {
 
     let arrowHtml = '';
     if (canExpand) {
-        arrowHtml = `<td><div class="expand-arrow ${isExpanded ? 'expanded' : ''}" onclick="toggleExpand(this, '${escapeAttr(child.path)}', ${level})">&#9654;</div></td>`;
+        arrowHtml = `<td><div class="expand-arrow ${isExpanded ? 'expanded' : ''}" onclick="toggleExpand(this, '${escapeJsStr(child.path)}', ${level})">&#9654;</div></td>`;
     } else {
         arrowHtml = '<td></td>';
     }
@@ -344,16 +344,16 @@ function renderChildRow(child, parentPath, level, idx) {
     if (!child.deletable) {
         actionBtn = `<button class="btn btn-danger" disabled title="System folder - protected">&#128274;</button>`;
     } else if (child.risk === 'caution') {
-        actionBtn = `<button class="btn btn-warning" onclick="confirmDelete('${escapeAttr(child.path)}')">&#9888;</button>`;
+        actionBtn = `<button class="btn btn-warning" onclick="confirmDelete('${escapeJsStr(child.path)}')">&#9888;</button>`;
     } else {
-        actionBtn = `<button class="btn btn-danger" onclick="confirmDelete('${escapeAttr(child.path)}')">&#128465;</button>`;
+        actionBtn = `<button class="btn btn-danger" onclick="confirmDelete('${escapeJsStr(child.path)}')">&#128465;</button>`;
     }
 
     return `
-        <tr class="row-child level-${level}" data-path="${escapeAttr(child.path)}" data-parent="${escapeAttr(parentPath)}">
+        <tr class="row-child level-${level}" data-path="${escapeHtmlAttr(child.path)}" data-parent="${escapeHtmlAttr(parentPath)}">
             ${arrowHtml}
             <td></td>
-            <td class="path" title="${escapeAttr(child.path)}" style="padding-left: ${indent}px">
+            <td class="path" title="${escapeHtmlAttr(child.path)}" style="padding-left: ${indent}px">
                 <span class="tree-prefix">${level < 3 ? '├─' : '└─'}</span>${escapeHtml(child.name)}
             </td>
             <td class="size">${formatSize(child.total_size)}</td>
@@ -372,7 +372,7 @@ function renderChildRows(parentRow, children, level) {
 
     children.forEach((child, idx) => {
         const tr = document.createElement('tr');
-        tr.innerHTML = renderChildRow(child, parentPath, level + 1, idx).replace(/^<tr[^>]*>|<\/tr>$/g, '');
+        tr.innerHTML = renderChildRow(child, parentPath, level + 1, idx).trim().replace(/^<tr[^>]*>|<\/tr>$/g, '');
         tr.className = `row-child level-${level + 1}`;
         tr.dataset.path = child.path;
         tr.dataset.parent = parentPath;
@@ -408,7 +408,7 @@ function renderTreemap(folders) {
 
         return `
             <div class="treemap-bar-row">
-                <div class="treemap-bar-label" title="${escapeAttr(folder.path)}">${escapeHtml(name)}</div>
+                <div class="treemap-bar-label" title="${escapeHtmlAttr(folder.path)}">${escapeHtml(name)}</div>
                 <div class="treemap-bar-track">
                     <div class="treemap-bar-fill ${folder.risk}" style="width: ${Math.max(barWidth, 2)}%">
                         ${barWidth > 15 ? `${pct}%` : ''}
@@ -485,9 +485,14 @@ function escapeHtml(str) {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
-function escapeAttr(str) {
+function escapeJsStr(str) {
     if (!str) return '';
     return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+}
+
+function escapeHtmlAttr(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
 function showLoading(text) {
