@@ -1,6 +1,8 @@
 """Tests for the safety module."""
 
-from folder_analyzer.safety import get_risk_level, is_deletable, get_risk_color, get_risk_label, RiskLevel
+from folder_analyzer.safety import (
+    get_risk_level, is_deletable, is_protected, get_risk_color, get_risk_label, RiskLevel,
+)
 
 
 def test_critical_system_folder():
@@ -46,6 +48,13 @@ def test_safe_user_folder():
 def test_safe_temp_folder():
     risk = get_risk_level("C:\\Users\\arjon\\AppData\\Local\\Temp")
     assert risk == RiskLevel.SAFE
+
+
+def test_caution_appdata_roaming():
+    risk = get_risk_level("C:\\Users\\arjon\\AppData\\Roaming\\SomeApp")
+    assert risk == RiskLevel.CAUTION
+    assert is_deletable("C:\\Users\\arjon\\AppData\\Roaming\\SomeApp") is True
+    assert is_protected("C:\\Users\\arjon\\AppData\\Roaming\\SomeApp") is True
 
 
 def test_is_deletable_safe():

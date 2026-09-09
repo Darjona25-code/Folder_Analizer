@@ -58,8 +58,7 @@ def test_get_folders_after_scan(tmp_dir):
 
 
 def test_get_folders_no_scan():
-    from api import routes
-    routes._last_scan_root = None
+    app.state.last_scan_root = None
     response = client.get("/api/folders")
     assert response.status_code == 400
 
@@ -102,8 +101,7 @@ def test_delete_multiple_mixed(tmp_dir):
 
 
 def test_export_no_scan():
-    from api import routes
-    routes._last_scan_root = None
+    app.state.last_scan_root = None
     response = client.post("/api/export", json={"format": "json"})
     assert response.status_code == 400
 
@@ -162,3 +160,102 @@ def test_folder_dict_has_risk_fields(tmp_dir):
     assert "risk_color" in root
     assert "deletable" in root
     assert root["risk"] in ("critical", "caution", "safe")
+
+
+def test_scan_root_not_in_top_folders(tmp_dir):
+    response = client.post("/api/scan", json={"path": tmp_dir})
+    data = response.json()
+    paths = {f["path"] for f in data["top_folders"]}
+    assert os.path.normpath(tmp_dir) not in paths
+
+
+def test_scan_root_cannot_be_deleted(tmp_dir):
+    client.post("/api/scan", json={"path": tmp_dir})
+    response = client.post("/api/delete", json={"paths": [tmp_dir]})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_blocked"] == 1
+    assert data["total_deleted"] == 0
+    assert os.path.exists(tmp_dir)
+
+
+def test_ancestor_of_scan_root_cannot_be_deleted(tmp_dir):
+    client.post("/api/scan", json={"path": os.path.join(tmp_dir, "sub1")})
+    response = client.post("/api/delete", json={"paths": [tmp_dir]})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_blocked"] == 1
+    assert data["total_deleted"] == 0
+
+
+def test_child_can_be_deleted_after_scan(tmp_dir):
+    client.post("/api/scan", json={"path": tmp_dir})
+    safe_path = os.path.join(tmp_dir, "sub1")
+    response = client.post("/api/delete", json={"paths": [safe_path]})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_blocked"] == 0
+    assert data["total_deleted"] == 1
+    assert not os.path.exists(safe_path)
+
+
+def test_state_reset_after_restart_reports_no_scan(tmp_dir):
+    client.post("/api/scan", json={"path": tmp_dir})
+    app.state.last_scan_root = None
+    assert client.get("/api/stats").status_code == 400
+    assert client.get("/api/folders").status_code == 400
+    assert client.post("/api/export", json={"format": "json"}).status_code == 400
+
+
+def test_state_is_read_from_app_state(tmp_dir):
+    client.post("/api/scan", json={"path": tmp_dir})
+    import api.main as api_main
+    assert api_main.app.state.last_scan_root is not None
+
+
+def test_drives_include_label():
+    response = client.get("/api/drives")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) > 0
+    assert all(d["label"] for d in data)
+    assert all(d["label"].endswith(":\\") for d in data)
+
+
+def test_export_csv_localized_es(tmp_dir):
+    client.post("/api/scan", json={"path": tmp_dir})
+    response = client.post("/api/export", json={"format": "csv", "lang": "es"})
+    assert response.status_code == 200
+    assert "Carpeta" in response.text
+
+
+def test_export_csv_default_english(tmp_dir):
+    client.post("/api/scan", json={"path": tmp_dir})
+    response = client.post("/api/export", json={"format": "csv"})
+    assert response.status_code == 200
+    assert "Folder" in response.text
+
+
+def test_export_spanish_html(tmp_dir):
+    client.post("/api/scan", json={"path": tmp_dir})
+    response = client.post("/api/export", json={"format": "html", "lang": "es"})
+    assert response.status_code == 200
+    assert "Analizador de Carpetas" in response.text
+
+
+def test_export_invalid_lang_falls_back_to_english(tmp_dir):
+    client.post("/api/scan", json={"path": tmp_dir})
+    response = client.post("/api/export", json={"format": "csv", "lang": "xx"})
+    assert response.status_code == 200
+    assert "Folder" in response.text
+
+
+def test_top_folders_are_children_not_root(tmp_dir):
+    response = client.post("/api/scan", json={"path": tmp_dir})
+    data = response.json()
+    root = data["root"]
+    root_children = {c["path"] for c in root["children"]}
+    for top in data["top_folders"]:
+        assert top["path"] in root_children or top["path"].startswith(
+            os.path.normpath(tmp_dir) + os.sep
+        )

@@ -67,6 +67,22 @@ def test_sort_folders_by_size(tmp_dir):
     assert top[0].total_size >= top[1].total_size
 
 
+def test_sort_folders_by_size_excludes_scan_root(tmp_dir):
+    scanner = Scanner(max_workers=2)
+    result = scanner.scan(tmp_dir)
+    top = sort_folders_by_size(result, top_n=50)
+
+    assert all(f.path != result.path for f in top), "scan root must not appear in top folders"
+
+
+def test_sort_folders_by_size_includes_children(tmp_dir):
+    scanner = Scanner(max_workers=2)
+    result = scanner.scan(tmp_dir)
+    top = sort_folders_by_size(result, top_n=50)
+
+    assert len(top) == 2  # sub1 and sub1/deep (sub2 is empty -> excluded)
+
+
 def test_to_dict(tmp_dir):
     scanner = Scanner(max_workers=2)
     result = scanner.scan(tmp_dir)

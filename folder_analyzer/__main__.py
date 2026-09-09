@@ -7,18 +7,29 @@ import locale
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, MofNCompleteColumn
-from rich.prompt import Prompt, IntPrompt
+from rich.prompt import Prompt
 from rich.panel import Panel
-from rich.text import Text
 
 from .scanner import Scanner, FolderInfo, sort_folders_by_size
 from .reporter import show_top_folders, show_tree, show_folder_detail
 from .treemap import show_treemap
-from .deleter import delete_folders, get_folder_size_recursive
+from .deleter import delete_folders
 from .exporter import export_json, export_csv, export_html
 from .safety import get_risk_level, RiskLevel
 from .i18n import I18n
 from .utils import format_size, get_default_drive
+
+
+class _UserExit(Exception):
+    """Raised internally when the user terminates input (EOF)."""
+
+
+def ask_text(prompt: str, **kwargs) -> str:
+    """Prompt.ask() wrapper that converts EOFError into a controlled exit."""
+    try:
+        return Prompt.ask(prompt, **kwargs)
+    except EOFError:
+        raise _UserExit() from None
 
 
 def detect_language() -> str:
@@ -34,12 +45,12 @@ def choose_language(console: Console) -> str:
         title="Language / Idioma",
         border_style="cyan",
     ))
-    choice = Prompt.ask("Select / Selecciona", choices=["1", "2"], default="1")
+    choice = ask_text("Select / Selecciona", choices=["1", "2"], default="1")
     return "en" if choice == "1" else "es"
 
 
 def choose_path(i18n: I18n, console: Console) -> str:
-    path = Prompt.ask(i18n.t("scan_path_prompt"), default=get_default_drive())
+    path = ask_text(i18n.t("scan_path_prompt"), default=get_default_drive())
     path = os.path.normpath(path)
     if not os.path.exists(path):
         console.print(f"[red]Path does not exist: {path}[/red]")
@@ -84,38 +95,51 @@ def show_main_menu(i18n: I18n, console: Console) -> str:
         title=i18n.t("app_title"),
         border_style="cyan",
     ))
-    return Prompt.ask(">", choices=["1", "2", "3", "4"])
+    return ask_text(">", choices=["1", "2", "3", "4"])
+
+
+def resolve_selection(choice: str, folders: list[FolderInfo]) -> FolderInfo | None:
+    """Map the user-entered number to the exact item currently displayed."""
+    try:
+        idx = int(choice) - 1
+    except ValueError:
+        return None
+    if 0 <= idx < len(folders):
+        return folders[idx]
+    return None
 
 
 def action_details(root: FolderInfo, top_folders: list[FolderInfo], i18n: I18n, console: Console):
     show_top_folders(top_folders, i18n, console, top_n=20)
     show_treemap(root, i18n, console)
 
+    current_list = top_folders
+
     while True:
-        choice = Prompt.ask(i18n.t("select_folder_num"), default="0")
+        choice = ask_text(i18n.t("select_folder_num"), default="0")
         if choice == "0":
             break
 
-        try:
-            idx = int(choice) - 1
-            if 0 <= idx < len(top_folders):
-                folder = top_folders[idx]
-                show_folder_detail(folder, i18n, console)
-
-                sub_folders = sort_folders_by_size(folder, top_n=15)
-                if sub_folders:
-                    show_top_folders(sub_folders, i18n, console, top_n=15)
-            else:
-                console.print(f"[yellow]{i18n.t('enter_number')}[/yellow]")
-        except ValueError:
+        folder = resolve_selection(choice, current_list)
+        if folder is None:
             console.print(f"[yellow]{i18n.t('enter_number')}[/yellow]")
+            continue
+
+        show_folder_detail(folder, i18n, console)
+
+        children = sort_folders_by_size(folder, top_n=15)
+        if children:
+            current_list = children
+            show_top_folders(children, i18n, console, top_n=15)
+        else:
+            current_list = top_folders
 
 
-def action_delete(top_folders: list[FolderInfo], i18n: I18n, console: Console):
+def action_delete(root: FolderInfo, top_folders: list[FolderInfo], i18n: I18n, console: Console):
     show_top_folders(top_folders, i18n, console, top_n=20)
 
-    console.print("\n[yellow]Enter folder numbers to mark for deletion (comma-separated, e.g. 1,3,5):[/yellow]")
-    choice = Prompt.ask(">")
+    console.print(f"\n[yellow]{i18n.t('delete_prompt_hint')}[/yellow]")
+    choice = ask_text(">")
 
     try:
         indices = [int(x.strip()) - 1 for x in choice.split(",")]
@@ -124,6 +148,7 @@ def action_delete(top_folders: list[FolderInfo], i18n: I18n, console: Console):
         return
 
     selected_paths = []
+    stats = {}
     for idx in indices:
         if 0 <= idx < len(top_folders):
             folder = top_folders[idx]
@@ -136,6 +161,7 @@ def action_delete(top_folders: list[FolderInfo], i18n: I18n, console: Console):
 
             console.print(f"  [cyan]{folder.path}[/cyan] - {size_str}")
             selected_paths.append(folder.path)
+            stats[folder.path] = (folder.total_size, folder.file_count)
 
     if not selected_paths:
         console.print(f"[yellow]{i18n.t('delete_no_folders')}[/yellow]")
@@ -145,8 +171,8 @@ def action_delete(top_folders: list[FolderInfo], i18n: I18n, console: Console):
     for p in selected_paths:
         console.print(f"  - {p}")
 
-    deleted = delete_folders(selected_paths, i18n, console)
-    console.print(f"\n[green]Deleted {deleted} folder(s).[/green]")
+    deleted = delete_folders(selected_paths, i18n, console, stats=stats, protected=[root.path])
+    console.print(f"\n[green]{i18n.t('deleted_count', count=deleted)}[/green]")
 
 
 def action_export(root: FolderInfo, i18n: I18n, console: Console):
@@ -155,8 +181,8 @@ def action_export(root: FolderInfo, i18n: I18n, console: Console):
     console.print(f"  {i18n.t('export_csv')}")
     console.print(f"  {i18n.t('export_html')}")
 
-    choice = Prompt.ask(i18n.t("export_prompt"), choices=["1", "2", "3"])
-    filename = Prompt.ask(i18n.t("export_filename"), default="report")
+    choice = ask_text(i18n.t("export_prompt"), choices=["1", "2", "3"])
+    filename = ask_text(i18n.t("export_filename"), default="report")
 
     ext_map = {"1": (".json", export_json), "2": (".csv", export_csv), "3": (".html", export_html)}
     ext, exporter_fn = ext_map[choice]
@@ -182,37 +208,45 @@ def main():
     parser.add_argument("--path", help="Path to scan")
     args = parser.parse_args()
 
-    if args.lang:
-        lang = args.lang
-    else:
-        lang = choose_language(console)
+    lang = "en"
+    try:
+        if args.lang:
+            lang = args.lang
+        else:
+            lang = choose_language(console)
 
-    i18n = I18n(lang)
+        i18n = I18n(lang)
 
-    console.print(Panel(
-        f"[bold cyan]{i18n.t('app_title')}[/bold cyan]\n"
-        f"Scan any drive or folder, view sizes, and safely free disk space.",
-        border_style="bright_blue",
-    ))
+        console.print(Panel(
+            f"[bold cyan]{i18n.t('app_title')}[/bold cyan]\n"
+            f"{i18n.t('tagline')}",
+            border_style="bright_blue",
+        ))
 
-    path = args.path if args.path else choose_path(i18n, console)
+        path = args.path if args.path else choose_path(i18n, console)
 
-    root = do_scan(path, i18n, console)
-    top_folders = get_top_folders(root)
+        root = do_scan(path, i18n, console)
+        top_folders = get_top_folders(root)
 
-    while True:
-        choice = show_main_menu(i18n, console)
+        while True:
+            choice = show_main_menu(i18n, console)
 
-        if choice == "1":
-            action_details(root, top_folders, i18n, console)
-        elif choice == "2":
-            action_delete(top_folders, i18n, console)
-            top_folders = get_top_folders(root)
-        elif choice == "3":
-            action_export(root, i18n, console)
-        elif choice == "4":
-            console.print(f"[cyan]{i18n.t('goodbye')}[/cyan]")
-            break
+            if choice == "1":
+                action_details(root, top_folders, i18n, console)
+            elif choice == "2":
+                action_delete(root, top_folders, i18n, console)
+                top_folders = get_top_folders(root)
+            elif choice == "3":
+                action_export(root, i18n, console)
+            elif choice == "4":
+                console.print(f"[cyan]{i18n.t('goodbye')}[/cyan]")
+                break
+    except _UserExit:
+        console.print()
+        console.print(f"[cyan]{I18n(lang).t('goodbye')}[/cyan]")
+    except KeyboardInterrupt:
+        console.print()
+        console.print(f"[cyan]{I18n(lang).t('goodbye')}[/cyan]")
 
 
 if __name__ == "__main__":

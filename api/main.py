@@ -28,4 +28,9 @@ async def serve_index():
 
 
 if __name__ == "__main__":
-    uvicorn.run("api.main:app", host="127.0.0.1", port=8000, reload=True)
+    # Development reload is opt-in via the environment (FOLDER_ANALYZER_RELOAD=1)
+    # so that scan state (app.state) is not silently wiped by an implicit reloader.
+    import os
+
+    reload_dev = os.environ.get("FOLDER_ANALYZER_RELOAD", "0") == "1"
+    uvicorn.run("api.main:app", host="127.0.0.1", port=8000, reload=reload_dev)

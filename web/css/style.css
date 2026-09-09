@@ -128,6 +128,28 @@ body {
     align-items: center;
 }
 
+.scan-stats,
+.disk-stats {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.scan-stats {
+    border-right: 1px solid var(--border);
+    padding-right: 24px;
+}
+
+.stat-path {
+    font-size: 12px;
+    font-weight: 500;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+}
+
 .stat-item {
     text-align: center;
 }
@@ -593,6 +615,14 @@ td.files {
     }
     .header-stats {
         gap: 16px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .scan-stats {
+        border-right: none;
+        padding-right: 0;
+        flex-wrap: wrap;
+        justify-content: center;
     }
     .scan-bar {
         flex-direction: column;

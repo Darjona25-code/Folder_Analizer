@@ -1,6 +1,6 @@
 """Pydantic models for Folder Analyzer API."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ScanRequest(BaseModel):
@@ -14,7 +14,7 @@ class FolderDict(BaseModel):
     file_count: int = 0
     folder_count: int = 0
     direct_size: int = 0
-    children: list["FolderDict"] = []
+    children: list["FolderDict"] = Field(default_factory=list)
     error: str | None = None
     risk: str = "safe"
     risk_color: str = "#3fb950"
@@ -53,9 +53,11 @@ class DeleteResponse(BaseModel):
 
 class ExportRequest(BaseModel):
     format: str
+    lang: str = "en"
 
 
 class DiskInfo(BaseModel):
+    label: str = ""
     total: int
     used: int
     free: int

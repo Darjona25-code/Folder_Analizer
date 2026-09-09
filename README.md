@@ -1,86 +1,143 @@
 # Folder Analyzer
 
-A Python CLI tool that scans any drive or folder, reports disk usage, and safely frees disk space by sending files to the Recycle Bin.
+A disk space analyzer that scans any drive or folder, reports folder sizes, and safely frees disk space by sending files to the Recycle Bin (recoverable). Ships with two front-ends:
+
+- **Interactive CLI** — Rich terminal UI with tables, ASCII treemap, and progress bars.
+- **Web UI** — FastAPI backend + static frontend (Caza Bytes branding) with drive stats, sortable table, treemap, and export.
 
 ## Features
 
-- **Fast multi-threaded scanning** — Uses `ThreadPoolExecutor` to scan drives quickly
-- **Interactive CLI** — Rich terminal UI with tables, trees, and progress bars
-- **ASCII treemap** — Visual bar chart showing disk usage proportions
+- **Fast multi-threaded scanning** — `ThreadPoolExecutor` for quick large-tree scans
+- **Interactive CLI** — Rich tables, trees, and progress bars
+- **ASCII + Web treemaps** — Visual share of each folder's disk usage
 - **Safety system** — Color-coded risk levels (CRITICAL / CAUTION / SAFE) to protect system folders
-- **Safe deletion** — Sends files to Recycle Bin (recoverable) instead of permanent delete
-- **Export reports** — Save scan results as JSON, CSV, or a visual HTML report
-- **Bilingual** — Full English and Spanish support (`--lang en` / `--lang es`)
+- **Scan-root protection** — The scanned folder (and any ancestor) can never be deleted, in CLI and API
+- **Safe deletion** — Sends files to the Recycle Bin (recoverable) instead of permanent delete
+- **Export reports** — JSON, CSV, or a self-contained HTML report
+- **Bilingual** — Full English and Spanish support (CLI `--lang en`/`es`, API `lang` parameter, localized exports)
 
 ## Installation
+
+Requires **Python 3.10+**.
 
 ```bash
 git clone https://github.com/Darjona25-code/Folder_Analizer.git
 cd Folder_Analizer
-pip install -r requirements.txt
+
+# Recommended: install the CLI as a command
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# Linux/macOS
+# source .venv/bin/activate
+
+pip install .
 ```
 
-## Usage
+This installs the `folder-analyzer` command. Alternatively `pip install -r requirements.txt` works for running from the source tree. For development use `pip install -e ".[dev]"`.
+
+> **Note:** the FastAPI Web UI (`api/`) and its frontend (`web/`) are currently run **from the source tree**; they are not bundled into the wheel distribution.
+
+## CLI Usage
 
 ```bash
-# Interactive mode
-python -m folder_analyzer
+# Interactive mode (asks for language, then path)
+folder-analyzer
 
-# Specify language and path
-python -m folder_analyzer --lang es --path C:\
+# Specify language and path directly
+folder-analyzer --lang es --path C:\
 
-# Quick scan with arguments
-python -m folder_analyzer --lang en --path D:\Games
+# Other languages / quick scan
+folder-analyzer --lang en --path D:\Games
 ```
+
+Also runnable as a module: `python -m folder_analyzer --lang en --path C:\`
 
 ### Menu Options
 
 | Option | Description |
 |--------|-------------|
-| **1 - View Details** | Drill into folders, see subfolder sizes and risk levels |
-| **2 - Delete** | Mark folders for safe deletion to Recycle Bin |
+| **1 - View Details** | Drill into folders; the number you type maps to the list shown on screen |
+| **2 - Delete** | Mark folders for safe deletion to Recycle Bin (the scan root is always excluded/protected) |
 | **3 - Export** | Export report as JSON, CSV, or self-contained HTML |
 | **4 - Quit** | Exit the application |
+
+Pressing `Ctrl+C` or ending input (EOF) at any prompt exits cleanly.
 
 ### Risk Levels
 
 | Level | Color | Description |
 |-------|-------|-------------|
 | CRITICAL | Red | System folders (WinSxS, System32, etc.) — **cannot be deleted** |
-| CAUTION | Yellow | Program folders (Program Files, etc.) — requires confirmation |
+| CAUTION | Yellow | Program/application folders (Program Files, AppData\Roaming, etc.) — requires confirmation |
 | SAFE | Green | User data, caches, temp files — safe to delete |
+
+## Web UI
+
+Run from the source tree:
+
+```bash
+python -m api
+# or
+python api\main.py
+```
+
+Then open <http://127.0.0.1:8000>. The interface shows drive stats plus the scanned folder's own stats (path, total, files, folders), a sortable folder table, a treemap, and export to JSON/CSV/HTML.
+
+> **Scan state is in-memory (per process).** Restarting the server clears the last scan. Automatic reload is opt-in so it never silently wipes state:
+>
+> ```bash
+> # Windows
+> set FOLDER_ANALYZER_RELOAD=1
+> # Linux/macOS
+> export FOLDER_ANALYZER_RELOAD=1
+> ```
+
+### API Endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/api/scan` | Scan a folder. Body `{"path": "..."}`. Returns root tree, stats, and top folders |
+| `GET` | `/api/folders` | Top folder list from the last scan (`?limit=50`) |
+| `GET` | `/api/stats` | Total size/files/folders + scan path of the last scan |
+| `POST` | `/api/delete` | Send folders to Recycle Bin. Body `{"paths":[...]}`. Scanned root + ancestors, and CRITICAL paths are always blocked |
+| `POST` | `/api/export` | Export report. Body `{"format":"json\|csv\|html","lang":"en\|es"}` |
+| `GET` | `/api/drives` | Available disks with `label`, used/free/total, percent |
+| `GET` | `/` | Web UI (static `index.html`) |
+
+Endpoints that read scan state return `400` until a scan has been performed in the current process.
 
 ## Project Structure
 
 ```
 Folder_Analizer/
-├── folder_analyzer/
-│   ├── __init__.py        # Package version
-│   ├── __main__.py        # Entry point + interactive menu
-│   ├── scanner.py         # Multi-threaded disk scanner
-│   ├── reporter.py        # Rich tables and tree view
-│   ├── treemap.py         # ASCII treemap visualization
-│   ├── deleter.py         # Safe deletion via Recycle Bin
-│   ├── safety.py          # Risk level detection
-│   ├── exporter.py        # JSON/CSV/HTML export
-│   ├── i18n.py            # English/Spanish translations
-│   └── utils.py           # Helper functions
-├── tests/
-│   ├── test_scanner.py
-│   ├── test_safety.py
-│   └── test_i18n.py
+├── folder_analyzer/           # Core package (CLI)
+│   ├── __init__.py            # Package version
+│   ├── __main__.py            # Entry point + interactive menu
+│   ├── scanner.py             # Multi-threaded disk scanner
+│   ├── reporter.py            # Rich tables and tree view
+│   ├── treemap.py             # Treemap visualization
+│   ├── deleter.py             # Safe deletion via Recycle Bin (iterative, protected paths)
+│   ├── safety.py              # Risk level detection
+│   ├── exporter.py            # JSON/CSV/HTML export (localized)
+│   ├── i18n.py                # English/Spanish translations
+│   └── utils.py               # Helper functions
+├── api/                       # FastAPI backend (Web UI)
+│   ├── main.py                # App + static file mounting + entry point
+│   ├── routes.py              # REST endpoints
+│   ├── models.py              # Pydantic models (scan/delete/export/drives)
+│   └── __main__.py            # `python -m api`
+├── web/                       # Static frontend
+│   ├── index.html
+│   ├── css/style.css
+│   ├── js/app.js
+│   └── assets/                # Branding (Caza Bytes)
+├── tests/                     # 81 unit + integration tests
 ├── requirements.txt
 ├── pyproject.toml
-├── LICENSE                # MIT
+├── LICENSE                    # MIT
 └── README.md
 ```
-
-## Dependencies
-
-- [Rich](https://github.com/Textualize/rich) — Terminal UI (tables, trees, progress bars)
-- [send2trash](https://github.com/thesophist/send2trash) — Cross-platform Recycle Bin support
-- [psutil](https://github.com/giampaolo/psutil) — System/disk utilities
-- [colorama](https://github.com/tartley/colorama) — Cross-platform terminal colors
 
 ## Running Tests
 
@@ -89,6 +146,18 @@ pip install pytest
 pytest tests/
 ```
 
+81 tests cover the scanner, safety rules, deletion (protected paths, iterative traversal), the CLI (EOF handling, drill-down), exports (localization), the API (state, root protection), and model defaults.
+
+## Dependencies
+
+- [Rich](https://github.com/Textualize/rich) — Terminal UI (tables, trees, progress bars)
+- [send2trash](https://github.com/thesophist/send2trash) — Cross-platform Recycle Bin support
+- [psutil](https://github.com/giampaolo/psutil) — System/disk utilities
+- [colorama](https://github.com/tartley/colorama) — Cross-platform terminal colors
+- [FastAPI](https://fastapi.tiangolo.com/) + [Uvicorn](https://www.uvicorn.org/) — Web backend
+- [aiofiles](https://github.com/Tinche/aiofiles) — Async file support (FastAPI static)
+- [httpx](https://www.python-httpx.org/) — API test client
+
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License — see [LICENSE](LICENSE) for details.

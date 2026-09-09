@@ -139,8 +139,14 @@ class Scanner:
 
 
 def sort_folders_by_size(info: FolderInfo, top_n: int = 20) -> list[FolderInfo]:
+    """Return descendants of *info* sorted by size.
+
+    The node passed in (e.g. the scanned root) is never included so that the
+    scan root is not exposed as a normal, deletable child folder.
+    """
     all_folders = []
-    _collect_folders(info, all_folders)
+    for child in info.children:
+        _collect_folders(child, all_folders)
     all_folders.sort(key=lambda f: f.total_size, reverse=True)
     return all_folders[:top_n]
 

@@ -61,7 +61,7 @@ async function loadDrives() {
         const drives = await res.json();
         if (drives.length > 0) {
             const mainDrive = drives[0];
-            document.getElementById('scanInput').value = 'C:\\';
+            document.getElementById('scanInput').value = mainDrive.label;
             updateDiskStats(mainDrive);
         }
     } catch (err) {
@@ -171,9 +171,16 @@ async function exportReport(format) {
 function renderAll() {
     if (!currentData) return;
 
-    updateDiskStatsFromSize(currentData.stats.total_size);
+    updateScannedStats(currentData.stats);
     renderTable(currentData.top_folders);
     renderTreemap(currentData.top_folders);
+}
+
+function updateScannedStats(stats) {
+    document.getElementById('scannedPath').textContent = stats.scan_path;
+    document.getElementById('scannedTotal').textContent = formatSize(stats.total_size);
+    document.getElementById('scannedFiles').textContent = stats.total_files.toLocaleString();
+    document.getElementById('scannedFolders').textContent = stats.total_folders.toLocaleString();
 }
 
 function updateDiskStats(drive) {
@@ -181,14 +188,10 @@ function updateDiskStats(drive) {
     const usedGB = (drive.used / (1024 ** 3)).toFixed(0);
     const freeGB = (drive.free / (1024 ** 3)).toFixed(0);
 
-    document.getElementById('diskTotal').textContent = totalGB + ' GB';
+    document.getElementById('diskLabel').textContent = drive.label;
     document.getElementById('diskUsed').textContent = usedGB + ' GB';
     document.getElementById('diskFree').textContent = freeGB + ' GB';
     document.getElementById('diskBarFill').style.width = drive.percent + '%';
-}
-
-function updateDiskStatsFromSize(totalBytes) {
-    document.getElementById('diskTotal').textContent = formatSize(totalBytes);
 }
 
 function renderTable(folders) {

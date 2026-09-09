@@ -28,7 +28,14 @@ def export_csv(root: FolderInfo, i18n: I18n, output_path: str):
     top_folders = sort_folders_by_size(root, top_n=500)
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["Folder", "Size (bytes)", "Size (human)", "Files", "Subfolders", "Risk"])
+        writer.writerow([
+            i18n.t("col_folder"),
+            i18n.t("export_csv_size_bytes"),
+            i18n.t("export_csv_size_human"),
+            i18n.t("col_files"),
+            i18n.t("col_subfolders"),
+            i18n.t("col_risk"),
+        ])
         for folder in top_folders:
             risk = get_risk_level(folder.path)
             writer.writerow([
@@ -100,7 +107,7 @@ def export_html(root: FolderInfo, i18n: I18n, output_path: str):
     <h1>{i18n.t('app_title')}</h1>
     <div class="meta">
         {i18n.t('treemap_total', size=format_size(total))} |
-        {root.file_count:,} files | {root.folder_count:,} folders |
+        {i18n.t('files_count', count=f'{root.file_count:,}')} | {i18n.t('folders_count', count=f'{root.folder_count:,}')} |
         {datetime.now().strftime('%Y-%m-%d %H:%M')}
     </div>
     <table>
@@ -111,7 +118,7 @@ def export_html(root: FolderInfo, i18n: I18n, output_path: str):
                 <th style="text-align:right">{i18n.t('col_size')}</th>
                 <th>{i18n.t('col_files')}</th>
                 <th>{i18n.t('col_risk')}</th>
-                <th>Distribution</th>
+                <th>{i18n.t('col_distribution')}</th>
             </tr>
         </thead>
         <tbody>{rows_html}

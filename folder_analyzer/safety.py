@@ -94,13 +94,14 @@ def get_risk_level(path: str) -> RiskLevel:
 
 def _is_program_folder(path: str) -> bool:
     upper = path.upper()
+    # AppData\Roaming holds sensitive per-user application data -> treat as CAUTION.
+    if "\\APPDATA\\ROAMING" in upper:
+        return True
     if "\\APPDATA" in upper or "\\DOWNLOADS" in upper or "\\DOCUMENTS" in upper:
         return False
     if "\\DESKTOP" in upper or "\\PICTURES" in upper or "\\VIDEOS" in upper:
         return False
-    if "\\MUSIC" in upper or "\\APPDATA\\LOCAL" in upper:
-        return False
-    if "\\DESKTOP\\FOLDERS" in upper or "\\MY DOCUMENTS" in upper:
+    if "\\MUSIC" in upper or "\\DESKTOP\\FOLDERS" in upper or "\\MY DOCUMENTS" in upper:
         return False
     return True
 

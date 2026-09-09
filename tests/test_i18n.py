@@ -66,7 +66,10 @@ def test_all_keys_exist_en():
         "app_title", "scan_path_prompt", "scanning", "scan_complete",
         "top_folders", "menu_details", "menu_delete", "menu_export",
         "menu_quit", "delete_confirm", "export_json", "export_csv",
-        "export_html", "goodbye",
+        "export_html", "goodbye", "tagline", "delete_prompt_hint",
+        "delete_root_blocked", "delete_warning_program", "deleted_count",
+        "col_subfolders", "col_distribution", "files_count", "folders_count",
+        "export_csv_size_bytes", "export_csv_size_human",
     ]
     for key in keys:
         result = i18n.t(key)
@@ -79,7 +82,10 @@ def test_all_keys_exist_es():
         "app_title", "scan_path_prompt", "scanning", "scan_complete",
         "top_folders", "menu_details", "menu_delete", "menu_export",
         "menu_quit", "delete_confirm", "export_json", "export_csv",
-        "export_html", "goodbye",
+        "export_html", "goodbye", "tagline", "delete_prompt_hint",
+        "delete_root_blocked", "delete_warning_program", "deleted_count",
+        "col_subfolders", "col_distribution", "files_count", "folders_count",
+        "export_csv_size_bytes", "export_csv_size_human",
     ]
     for key in keys:
         result = i18n.t(key)

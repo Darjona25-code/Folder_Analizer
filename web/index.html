@@ -46,20 +46,40 @@
             <div class="header-subtitle">by Caza Bytes</div>
         </div>
         <div class="header-stats">
-            <div class="stat-item">
-                <div class="stat-label">Total</div>
-                <div class="stat-value" id="diskTotal">--</div>
+            <div class="scan-stats">
+                <div class="stat-item">
+                    <div class="stat-label">Scanned Path</div>
+                    <div class="stat-value stat-path" id="scannedPath">&mdash;</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Scanned total</div>
+                    <div class="stat-value" id="scannedTotal">--</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Files</div>
+                    <div class="stat-value" id="scannedFiles">--</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Folders</div>
+                    <div class="stat-value" id="scannedFolders">--</div>
+                </div>
             </div>
-            <div class="stat-item">
-                <div class="stat-label">Used</div>
-                <div class="stat-value" id="diskUsed">--</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-label">Free</div>
-                <div class="stat-value" id="diskFree">--</div>
-            </div>
-            <div class="disk-bar">
-                <div class="disk-bar-fill" id="diskBarFill" style="width: 0%"></div>
+            <div class="disk-stats">
+                <div class="stat-item">
+                    <div class="stat-label">Disk</div>
+                    <div class="stat-value" id="diskLabel">--</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Used</div>
+                    <div class="stat-value" id="diskUsed">--</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Free</div>
+                    <div class="stat-value" id="diskFree">--</div>
+                </div>
+                <div class="disk-bar">
+                    <div class="disk-bar-fill" id="diskBarFill" style="width: 0%"></div>
+                </div>
             </div>
         </div>
     </header>
