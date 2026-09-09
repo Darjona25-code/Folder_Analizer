@@ -74,13 +74,15 @@ Pressing `Ctrl+C` or ending input (EOF) at any prompt exits cleanly.
 
 ## Web UI
 
-Run from the source tree:
+Run from the source tree (works from any shell, including Git Bash):
 
 ```bash
 python -m api
-# or
-python api\main.py
 ```
+
+> Run it as a module: `python api/main.py` or `python api\main.py` fail with
+> `ImportError: attempted relative import` (and in Git Bash a backslash breaks
+> the path). Use `python -m api`.
 
 Then open <http://127.0.0.1:8000>. The interface shows drive stats plus the scanned folder's own stats (path, total, files, folders), a sortable folder table, a treemap, and export to JSON/CSV/HTML.
 
