@@ -94,7 +94,7 @@ end of every phase. Per-phase results are logged here (append-only table).
 
 | Phase | SCAN TIME (s) | FILES/S | PEAK MEMORY (MB) | RETAINED RECORDS | NOTES |
 |---|---|---|---|---|---|
-| 1 | _(recorded at Phase 1 close)_ | | | n/a (Phase 3) | baseline reference |
+| 1 | **0.816** | **61,290** | **53.65** (RSS delta; Python alloc peak 19.44) | n/a (Phase 3) | **baseline reference** — 50,000 files, 37 dirs, 45,451,138,200 B fixture |
 | 2 | | | | | |
 | 3 | | | | | |
 | … | | | | | |
@@ -105,6 +105,12 @@ explicitly user-overridden and documented). See `docs/ROADMAP.md §15/§22`.
 
 ## 7. Reference environment
 
-Documented at baseline: OS, Python version, hardware (the developer laptop). Any change
-of environment that legitimately shifts the baseline must be documented with
+- **OS:** Windows 11 Pro 24H2 (build 26200), 64-bit (`Windows-11-10.0.26200-SP0`)
+- **Python:** 3.12.10
+- **Hardware:** developer laptop (see machine specs at Phase 1 close)
+- **Fixture:** `benchmarks/generated/fixture` — 50,000 files, 37 dirs,
+  45,451,138,200 B nominal size, seed `20260101` (sparse files; see `gen_fixture.py`).
+- **JSON artifact:** `benchmarks/results/smoke-phase1.json`
+
+Any change of environment that legitimately shifts the baseline must be documented with
 justification — a new baseline is never established silently.
