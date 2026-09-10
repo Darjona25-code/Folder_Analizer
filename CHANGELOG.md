@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Phase 3 — File Analysis & Data Model)
+
+- **Per-file Level-1 metadata** (`folder_analyzer/scanner.py`, `engine/models.py`
+  `FileEntry`): path, filename, extension, size, created/modified/accessed
+  timestamps, stat attributes — collected during the existing traversal with
+  **zero additional syscalls** (reuses the single `entry.stat()` per file; symlink
+  flag from the DirEntry scandir cache). Records are `category="unknown"` /
+  `assessment=None` — metadata only, no classification, KB, or content reads.
+- **Data model** (`engine/models.py`): `AnalysisState`
+  (DISCOVERED/ANALYZED/RETAINED), per-folder `FolderAggregation`
+  (`files_analyzed`, `records_retained`, `total_descendant_size`,
+  `by_impact`/`by_recommendation`/`by_confidence` shape, protected/unknown/
+  user_data count+size, `app_ids`), whole-scan `ScanResult`.
+- **Bounded prioritized retention** (`engine/retention.py`): configurable global
+  budget (default 10,000) + per-folder cap (default 200); eviction priority
+  non-safe → representative (one per folder/category) → largest → path. The
+  non-safe relevance signal is inert in Phase 3 (implemented + tested, live in
+  Phase 5). Eviction never reduces `files_analyzed`; evicted folders are
+  re-analyzed on demand via `Scanner.records_for` (single-folder re-scan).
+- **100%-analyzed invariant:** `files_analyzed` always equals 100% of accessible
+  files, even when `records_retained` < files_analyzed due to eviction (proven by
+  an explicit test).
+- **Benchmark** (vs Phase 2 reference 0.919 s / 54,386 files/s / 50.54 MiB):
+  Phase 3 = **1.054 s / 47,437 files/s / 59.75 MiB** (+14.7% time, within the
+  20% gate), 7,400 retained records (default caps). Regression investigation
+  documented in `docs/ARCHITECTURE.md` §6: naive all-record materialization was
+  2.109 s / 105 MiB → fixed by lazy retention-only materialization.
+- **Tests:** `tests/test_file_analysis.py` (12 tests: metadata extraction,
+  zero-extra-syscall instrumented count, per-folder cap / global budget / cap
+  zero, eviction priority incl. non-safe hook + representative sampler,
+  100%-analyzed invariant, aggregation shape, on-demand re-analysis). Suite grew
+  133 → **145 passed, 2 skipped**.
+- **Docs:** `docs/ARCHITECTURE.md` scanner flow + file-analysis/retention model +
+  benchmark table; `docs/SAFETY.md` content-analysis status — **Level 2 (magic
+  bytes ≤512 B) and Level 3 (≤4 KB inspection) are explicitly NOT implemented**
+  (Phase 4); classification/composition remain Phase 5.
+
 ### Added (Phase 2 — Safety Engine Model)
 
 - **Three-axis safety model foundation** (`folder_analyzer/engine/`): `enums.py`

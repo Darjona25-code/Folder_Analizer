@@ -95,3 +95,37 @@ folder-analyzer --path C:\
   commit (this one also updates CHANGELOG/SESSION); all pushed to `origin/master`.
 - **Next:** Phase 3 — File Analysis Engine (per-file metadata, three-level analysis,
   DISCOVERED/ANALYZED/RETAINED states, scan-time NOT_RESOLVABLE surfacing).
+
+## Phase 3 — File Analysis & Data Model (COMPLETED)
+
+- **Delivered** (approved scope):
+  - `engine/models.py` — `AnalysisState` (DISCOVERED/ANALYZED/RETAINED), frozen
+    `FileEntry` (path, filename, extension, size, created/modified/accessed,
+    attributes, `assessment=None`, `category="unknown"`, `is_representative`,
+    `analysis_state`), frozen `FolderAggregation` + `ScanResult`.
+  - `engine/retention.py` — `RetentionConfig` (global budget default 10,000,
+    per-folder cap default 200), `RetainedFileStore`: lazy raw `(DirEntry, stat)`
+    piping, eviction priority non-safe → representative → largest → path,
+    `was_evicted`/counters, single-folder re-fetch API.
+  - `folder_analyzer/scanner.py` — Level-1 per-file metadata with **zero extra
+    syscalls** (one `stat` per file, one `scandir` per dir, verified by an
+    instrumented-count test); `records_for`/`is_evicted`/`scan_result`/
+    `aggregation_for`; `files_analyzed` ALWAYS = 100% of accessible files.
+  - **Level 2 (magic bytes ≤512 B) / Level 3 (≤4 KB) NOT implemented** — moved to
+    Phase 4; classification/composition remain Phase 5 (docs updated to state this
+    explicitly).
+- **Tests:** `tests/test_file_analysis.py` (12 tests). Suite grew **133 → 145 passed,
+  2 skipped**.
+- **Benchmark (vs Phase 2 reference 0.919 s / 54,386 files/s / 50.54 MiB):** Phase 3 =
+  1.054 s / 47,437 files/s / 59.75 MiB (+14.7% time, within 20% gate), 7,400 retained.
+  Gate hit during development: naive all-records materialization measured 2.109 s /
+  105 MiB → root-caused (FileEntry object churn) and fixed by lazy retention-only
+  materialization (`perf(scanner)` commit).
+- **Docs:** `docs/ARCHITECTURE.md` (scanner flow + file-analysis model + §6 benchmark
+  rows Phases 2/3, incl. the regression investigation); `docs/SAFETY.md` §6.1
+  content-analysis levels + limitation #6; `docs/ROADMAP.md` Phase 3 marked complete.
+- **Logs:** `feat(engine)` (models+retention), `feat(scanner)` (metadata + benchmark
+  wiring), `test` (file-analysis suite), `perf(scanner)` (lazy materialization),
+  `docs` (Phase 3). Pushed to `origin/master`.
+- **Next:** Phase 4 — Knowledge Base (Levels 2/3 content detection as re-scoped,
+  signature registers, optional foundation-data feeds).
