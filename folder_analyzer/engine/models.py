@@ -15,8 +15,9 @@ immutability of this dataclass supports.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, Optional
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Dict, Optional, Tuple
 
 from .enums import (
     ConfidenceLevel,
@@ -105,3 +106,118 @@ class Assessment:
         object.__setattr__(self, "recommendation", recommendation)
         object.__setattr__(self, "reason_key", reason_key)
         object.__setattr__(self, "reason_params", reason_params)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — File Analysis & Data Model
+#
+# FileEntry: per-file metadata collected during the scan traversal with zero
+# additional syscalls (reuses the DirEntry data + the single existing
+# entry.stat(follow_symlinks=False) call). No classification here — that is
+# Phase 4 (knowledge base) / Phase 5 (recommendation engine). In Phase 3 every
+# record carries category="unknown" and assessment=None.
+#
+# Three-stage record lifecycle (roadmap §8): DISCOVERED -> ANALYZED -> RETAINED.
+# ANALYZED covers 100% of accessible files; RETAINED is the bounded, prioritized
+# subset kept in memory by the retention store. Eviction never reduces the
+# ANALYZED count.
+# ---------------------------------------------------------------------------
+
+
+class AnalysisState(Enum):
+    """Record lifecycle state (roadmap §8 three-stage model)."""
+
+    DISCOVERED = "discovered"
+    ANALYZED = "analyzed"
+    RETAINED = "retained"
+
+
+@dataclass(frozen=True)
+class FileEntry:
+    """Per-file metadata record (Phase 3 — metadata only, no classification).
+
+    Build cost: reuses the DirEntry handed out by ``os.scandir`` plus the one
+    ``entry.stat(follow_symlinks=False)`` call the scanner already made for the
+    file size — no additional syscalls are issued to populate this record.
+
+    ``created_ts`` is ``st_ctime`` -> creation time on Windows, inode-change
+    time on POSIX. ``attributes`` carries the raw stat fields the scanner
+    observes (mode/ino/nlink/symlink flag), not a classification.
+
+    ``assessment`` is a Phase 5 placeholder and is None throughout Phase 3/4.
+    ``is_representative`` is set by the retention sampler (one record per
+    (folder, category) survives eviction preferentially).
+    """
+
+    path: str
+    filename: str
+    extension: str
+    size: int
+    created_ts: Optional[float]
+    modified_ts: Optional[float]
+    accessed_ts: Optional[float]
+    attributes: Dict[str, object]
+    assessment: Optional[Assessment] = None
+    category: str = "unknown"
+    is_representative: bool = False
+    analysis_state: AnalysisState = AnalysisState.ANALYZED
+
+    @property
+    def is_user_data(self) -> bool:
+        return bool(self.assessment and self.assessment.is_user_data)
+
+
+@dataclass(frozen=True)
+class FolderAggregation:
+    """Per-folder aggregation over ALL analyzed files (roadmap §8/§9).
+
+    ``files_analyzed`` ALWAYS equals 100% of the accessible files in the
+    folder's direct scan set, regardless of how many ``records_retained`` were
+    kept after eviction. The ``by_impact`` / ``by_recommendation`` /
+    ``by_confidence`` dicts and ``app_ids`` are structurally defined now; they
+    are populated with real classifications from Phase 5 on. Phase 3 leaves
+    every record unclassified (category "unknown"), so ``unknown_count`` /
+    ``unknown_size`` reflect the unclassified default and the ``by_*`` dicts
+    are zero.
+    """
+
+    files_analyzed: int = 0
+    records_retained: int = 0
+    total_descendant_size: int = 0
+    by_impact: Dict[SystemImpact, int] = field(
+        default_factory=lambda: {i: 0 for i in SystemImpact}
+    )
+    by_recommendation: Dict[DeletionRecommendation, int] = field(
+        default_factory=lambda: {r: 0 for r in DeletionRecommendation}
+    )
+    by_confidence: Dict[ConfidenceLevel, int] = field(
+        default_factory=lambda: {c: 0 for c in ConfidenceLevel}
+    )
+    protected_count: int = 0
+    protected_size: int = 0
+    unknown_count: int = 0
+    unknown_size: int = 0
+    user_data_count: int = 0
+    user_data_size: int = 0
+    app_ids: Dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ScanResult:
+    """Whole-scan summary (roadmap §11 'integrated ScanResult').
+
+    ``files_analyzed`` is the total over all folders and always equals 100% of
+    the accessible files found; it is independent of ``records_retained``.
+    ``per_folder`` maps normalized folder path -> ``FolderAggregation``.
+    Folders whose retained records were all evicted are still present here with
+    full ``files_analyzed`` counts (their records are re-computed on demand by
+    the scanner's re-analysis path, not lost).
+    """
+
+    root_path: str
+    files_analyzed: int = 0
+    records_retained: int = 0
+    total_descendant_size: int = 0
+    inaccessible_count: int = 0
+    folder_errors: Tuple[str, ...] = ()
+    per_folder: Dict[str, FolderAggregation] = field(default_factory=dict)
