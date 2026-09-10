@@ -1,6 +1,6 @@
 # Folder Analyzer — Master Roadmap v3.0
 
-Status: **APPROVED — Phase 1 in progress.**
+Status: **APPROVED — Phases 1–3 complete, Phase 4 next.**
 Version of this document: Phase 1 baseline commit.
 
 This is the implementation contract for the project. It is the single, internally
@@ -456,6 +456,18 @@ Fixed process (re-affirmed):
 - **Estimated effort:** 5–9 h. **Uncertainty:** Low.
 
 ### Phase 3 — File Analysis & Data Model
+- **Status: COMPLETE (approved scope).** Delivered: per-file Level-1 metadata
+  (zero extra syscalls), DISCOVERED/ANALYZED/RETAINED states, per-folder
+  `FolderAggregation` + `ScanResult`, bounded prioritized retention (configurable
+  global budget 10k + per-folder cap 200, non-safe → representative → largest),
+  on-demand single-folder re-analysis, 100%-analyzed invariant under eviction
+  (proven by test). Implementation: `folder_analyzer/engine/models.py`,
+  `engine/retention.py`, `folder_analyzer/scanner.py` (the roadmap's
+  `analysis.py` was folded into `engine/`).
+- **Approved re-scoping during Phase 3:** Level 2 (magic bytes ≤512 B) and Level 3
+  (targeted inspection ≤4 KB) are **NOT implemented in Phase 3**; they move to
+  Phase 4 where ambiguous-type resolution needs them. Classification/composition
+  remain Phase 5.
 - **Objective:** scanner per-file metadata; 3-level content analysis; DISCOVERED/ANALYZED/RETAINED states; aggregates over all analyzed; bounded prioritized retention.
 - **Why:** recommendations/exports need file-level evidence; performance baseline needed before Phase 8.
 - **Dependencies:** Phase 2 (types).

@@ -1,10 +1,11 @@
 # Folder Analyzer — Safety Model & Deletion Security
 
-Status: **Phase 2 — safety model foundation implemented.**
+Status: **Phase 3 — metadata/retention foundation implemented; no classification.**
 The three-axis safety model (enums, `Assessment`, construction-time confidence
-gate, explainability) is implemented in Phase 2 and documented in §6 below.
-Folder-level composition and the live recommendation engine are **Phase 5
-(composition)** work.
+gate, explainability) is implemented in Phase 2 and documented in §6. Phase 3
+adds per-file metadata + bounded retention (Level-1 analysis only). Folder-level
+composition and the live recommendation engine are **Phase 5 (composition)**
+work; content-signature detection is Phase 4.
 
 ---
 
@@ -154,6 +155,28 @@ safe-to-delete rationale. All of this is verified in
 strings resolve to localized EN/ES text following the `i18n.py` pattern. The
 full single-source i18n migration is Phase 7.
 
+### Content-analysis levels & retention (Phase 3 status)
+
+- **Level 1 (metadata/path, no file I/O) is implemented** by the scanner
+  (`folder_analyzer/scanner.py`, `engine/models.py` `FileEntry`): per-file
+  path/filename/extension/size/timestamps/attributes collected during traversal
+  with **zero additional syscalls** (reuses the single `entry.stat()` per file).
+  Records stay `category="unknown"` and `assessment=None`.
+- **Level 2 (magic bytes, ≤512 B) and Level 3 (targeted bounded inspection,
+  ≤4 KB) are NOT implemented.** They are Phase 4 (Knowledge Base) work — no code
+  path reads file contents in Phase 3.
+- **Bounded retention** (`engine/retention.py`): configurable global budget
+  (default 10,000 records) and per-folder cap (default 200); priority
+  non-safe → representative → largest → path. In Phase 3 the non-safe signal is
+  inert (nothing is classified yet); it is implemented and tested with synthetic
+  Assessments so it activates automatically in Phase 5.
+- **Three-stage lifecycle:** ANALYZED always covers **100% of accessible files**;
+  RETAINED is the bounded subset. Eviction reduces `records_retained` only —
+  never `files_analyzed`. Folders whose records were evicted are re-analyzed on
+  demand (single-folder re-scan) for drill-down.
+- **Relevant defense:** "not retained" must never be presented as "not analyzed";
+  the analyzer counts every accessible file independently of retention.
+
 ## 7. TOCTOU / race conditions (honest statement)
 
 Canonicalization does not completely solve race conditions. This document states
@@ -232,6 +255,10 @@ deletion security):
 5. The Phase 2 three-axis `Assessment` is a pure value model: nothing in the CLI, API,
    or web consumes it yet. Pipeline integration (scan-time assessments, folder
    aggregation, delete UI gating) is Phase 5+.
+6. Phase 3 file analysis is **metadata only (Level 1)**: per-file `FileEntry`
+   records carry no classification, no signatures, and no content reads. The
+   default `unknown` category and zeroed `by_*` aggregations must never be read
+   as safety signals.
 
 ## 11. What Phase 5 will add
 
@@ -246,7 +273,9 @@ deletion security):
   named constants.
 
 Scan-time `NOT_RESOLVABLE` surfacing (confidence flagging, "cannot be validated"
-status in scan output) is deliberately **deferred to Phase 3 (per-file analysis) /
-Phase 5 (recommendation engine)** — see the §3 matrix: Phase 1 implements only
-delete-time `NOT_RESOLVABLE` handling. The `FolderInfo.error` field is pre-existing
+status in scan output) is deliberately **NOT implemented in Phases 1–3**: Phase 3
+implemented only the Level-1 metadata/retention foundation; the classification
+that would produce a `NOT_RESOLVABLE` flag belongs to **Phase 5 (recommendation
+engine)** — see the §3 matrix. Phase 1 implements only delete-time
+`NOT_RESOLVABLE` handling. The `FolderInfo.error` field is pre-existing
 and is not a `NOT_RESOLVABLE` classification.

@@ -1,10 +1,10 @@
 # Folder Analyzer — Architecture
 
-Status: **Phase 2 — scaffold + safety-model foundation.** This document intentionally
-contains only the core/interface boundary, the current module map, the CLI/Web/Desktop
-relationship, and the benchmark baseline placeholder. File analysis/retention
-(§ Phase 3), performance (§ Phase 8), desktop (§ Phase 9/10), packaging (§ Phase 11),
-and localization (§ Phase 7) sections will be expanded in their respective phases.
+Status: **Phase 3 — file analysis (Level 1) + bounded retention implemented.**
+This document intentionally contains only the core/interface boundary, the current
+module map, the CLI/Web/Desktop relationship, and the benchmark table. Performance
+(§ Phase 8), desktop (§ Phase 9/10), packaging (§ Phase 11), and localization (§ Phase 7)
+sections will be expanded in their respective phases.
 
 ---
 
@@ -32,17 +32,18 @@ Interfaces:
 - **Desktop** (PySide6, Phase 9+) consumes the core **directly in-process**. There is
   **no** `Desktop → localhost FastAPI → Core` path.
 
-## 2. Current module map (Phase 2)
+## 2. Current module map (Phase 3)
 
 | Module | Responsibility | Boundary |
 |---|---|---|
-| `folder_analyzer/scanner.py` | Multi-threaded disk scan → `FolderInfo` tree | Core |
+| `folder_analyzer/scanner.py` | Multi-threaded disk scan → `FolderInfo` tree + `ScanResult`; per-file Level-1 metadata (zero extra syscalls); per-folder `FolderAggregation`; on-demand single-folder re-scan (`records_for`) | Core |
 | `folder_analyzer/deleter.py` | User-facing safe deletion flow (CLI-level) | Core (UI-agnostic; uses Rich only for CLI presentation) |
 | `folder_analyzer/security_guard.py` | Six-condition canonical deletion guard | Core — security boundary |
 | `folder_analyzer/audit.py` | Append-only JSON Lines deletion audit log | Core |
 | `folder_analyzer/safety.py` | Risk levels + protected path detection (v2 model; superseded for assessment by the three-axis model) | Core |
 | `folder_analyzer/engine/enums.py` | Three-axis value spaces: `SystemImpact` / `DeletionRecommendation` / `ConfidenceLevel` | Core — safety model |
-| `folder_analyzer/engine/models.py` | Immutable `Assessment` + construction-time confidence gate (I9) with I3/I7 floors | Core — safety model boundary |
+| `folder_analyzer/engine/models.py` | Immutable `Assessment` (phase 2, confidence gate I9/I3/I7) + `FileEntry` / `FolderAggregation` / `ScanResult` (phase 3, metadata-only) | Core — safety model + data-model boundary |
+| `folder_analyzer/engine/retention.py` | `RetentionConfig` + `RetainedFileStore`: bounded prioritized FileRecord retention (non-safe → representative → largest), lazy `FileEntry` materialization from raw `(DirEntry, stat)` pairs | Core — retention boundary |
 | `folder_analyzer/engine/explain.py` | `reason_key` → localized EN/ES text (Phase 2 keys; full i18n migration is Phase 7) | Core |
 | `folder_analyzer/utils.py` | Size formatting, drive default | Core |
 | `folder_analyzer/treemap.py` | Treemap layout (presentation helper) | Core |
@@ -54,9 +55,11 @@ Interfaces:
 | `benchmarks/` | Fixture generator + smoke benchmark (fixed baseline) | Tooling |
 | `tests/` | pytest suites | Tooling |
 
-Phase 2 adds the `folder_analyzer/engine/` safety-model foundation (enums,
-`Assessment`, confidence gate, explain). Nothing in the live scan/delete pipeline
-consumes it yet — the classifier/recommendation engine integrates in Phase 5.
+Phase 3 wires the metadata + retention layer: the scanner records every accessible
+file (analyzable) but materializes `FileEntry` objects **only for the bounded,
+prioritized retained subset**. No classification exists yet (`category="unknown"`,
+`assessment=None`); the `by_*` aggregation dicts are structural until Phase 5 populates
+them. The classification/recommendation engine integrates in Phase 5.
 
 ## 3. CLI / Web / Desktop relationship
 
@@ -68,16 +71,48 @@ consumes it yet — the classifier/recommendation engine integrates in Phase 5.
 ## 4. Scanner flow (current)
 
 ```
-Input path ─► Scanner.scan(path) ─► FolderInfo tree
+Input path ─► Scanner.scan(path) ─► FolderInfo tree  (+ ScanResult via scan_result())
                 │
-                ├─ per-file: size (file_count, direct_size)
+                ├─ per-file (Level 1, metadata only, ZERO extra syscalls):
+                │     reuse the single entry.stat(follow_symlinks=False) call
+                │     → FileEntry(path, filename, extension, size,
+                │                 created/modified/accessed, attributes)
+                ├─ record lifecycle DISCOVERED → ANALYZED → RETAINED:
+                │     ANALYZED  == 100% of accessible files  (files_analyzed)
+                │     RETAINED  == bounded prioritized subset (retention store)
                 ├─ per-dir: children, total_size, error
-                └─ aggregates: total_size / file_count / folder_count
+                ├─ retention (roadmap §9): configurable global budget (default
+                │     10,000) and per-folder cap (default 200); eviction order
+                │     non-safe > representative > largest > path tie-break
+                └─ aggregates: FolderAggregation per folder + ScanResult
 ```
 
-Phase 3 adds per-file metadata, three-level content analysis, and the
-DISCOVERED/ANALYZED/RETAINED states. Phase 5 adds per-item and per-folder Safety
-assessments (emitted by the Phase 2 `engine/` value layer).
+### File-analysis model (Phase 3 as implemented)
+
+- **Three-stage model (roadmap §8):** DISCOVERED (encountered) → ANALYZED (metadata
+  extracted) → RETAINED (kept in the bounded store). ANALYZED always equals **100% of
+  the accessible files**; eviction only reduces the RETAINED count. The UI must never
+  imply "not retained = not analyzed".
+- **Level 1 (metadata/path, no file I/O beyond scandir+stat) is implemented** by the
+  scanner. It makes **zero additional syscalls**: timestamps and attributes come from
+  the same `entry.stat(follow_symlinks=False)` call already needed for the size, and
+  the symlink flag comes from the DirEntry scandir cache (verified by an instrumented
+  count test: one `stat` per file, one `scandir` per folder).
+- **Level 2 (magic bytes, ≤512 B) and Level 3 (targeted bounded inspection, ≤4 KB)
+  are NOT implemented in Phase 3.** They belong to Phase 4 (Knowledge Base), where
+  ambiguous-type resolution actually needs them. No code path reads file *contents*.
+- **Inaccessible files** (permission/OS errors) are counted separately
+  (`inaccessible_count`); they are not part of `files_analyzed`.
+- **Retention relevance is intentionally inert in Phase 3:** nothing is classified, so
+  no record is ever non-safe; the `non-safe → representative → largest` priority is
+  implemented and unit-tested with synthetic Assessments and becomes live automatically
+  when Phase 5 attaches real ones.
+- **On-demand re-analysis:** drilling into a folder whose records were evicted triggers
+  a single-folder re-scan (`Scanner.records_for`) that re-reads that folder from disk.
+
+Phase 5 adds per-item and per-folder Safety assessments (emitting the Phase 2 `engine/`
+value layer) and populates the `by_impact` / `by_recommendation` / `by_confidence` /
+`app_ids` aggregation fields.
 
 ## 5. Deletion flow (Phase 1)
 
@@ -101,9 +136,9 @@ end of every phase. Per-phase results are logged here (append-only table).
 
 | Phase | SCAN TIME (s) | FILES/S | PEAK MEMORY (MB) | RETAINED RECORDS | NOTES |
 |---|---|---|---|---|---|
-| 1 | **0.816** | **61,290** | **53.65** (RSS delta; Python alloc peak 19.44) | n/a (Phase 3) | **baseline reference** — 50,000 files, 37 dirs, 45,451,138,200 B fixture |
-| 2 | | | | | |
-| 3 | | | | | |
+| 1 | **0.816** | **61,290** | **53.65** (RSS delta; Python alloc peak 19.44) | n/a (Phase 3) | **original baseline** — 50,000 files, 37 dirs, 45,451,138,200 B fixture |
+| 2 | 0.919 | 54,386 | 50.54 (RSS delta; alloc peak 19.32) | 0 | **Phase-3 reference baseline** (post-security-fix close; engine value layer, scan path untouched) |
+| 3 | 1.054 | 47,437 | 59.75 (RSS delta; alloc peak 21.85) | 7,400 | Level-1 metadata + bounded retention (default caps 10,000/200); +14.7% time vs Phase 2 — regression investigation: an initial all-FileEntry materialization measured **2.109 s / 105 MB**, fixed by lazy retention-only materialization (1.046/1.054 s across two runs) |
 | … | | | | | |
 
 Regression policy: a `>20%` regression vs the documented baseline is a **phase-closing
@@ -117,7 +152,8 @@ explicitly user-overridden and documented). See `docs/ROADMAP.md §15/§22`.
 - **Hardware:** developer laptop (see machine specs at Phase 1 close)
 - **Fixture:** `benchmarks/generated/fixture` — 50,000 files, 37 dirs,
   45,451,138,200 B nominal size, seed `20260101` (sparse files; see `gen_fixture.py`).
-- **JSON artifact:** `benchmarks/results/smoke-phase1.json`
+- **JSON artifacts:** `benchmarks/results/smoke-phase1.json` (baseline),
+  `smoke-phase2-rerun.json` (Phase-2 reference), `smoke-phase3-rerun2.json` (Phase 3).
 
 Any change of environment that legitimately shifts the baseline must be documented with
 justification — a new baseline is never established silently.
