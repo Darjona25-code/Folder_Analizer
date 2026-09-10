@@ -4,6 +4,11 @@ If you need to continue this development session on another PC, open opencode an
 
 **Link:** https://opncd.ai/share/a8LeCjC2
 
+> **Handoff completo (2026-09-10, fin de Phase 3):** lee `session/HANDOFF-2026-09-10-ES.md`
+> para el estado íntegro y las instrucciones. Para restaurar la conversación completa:
+> `opencode import session\session-export-phase3-sanitized.json`
+> (export sanitizado con `opencode export <sessionId> --sanitize`).
+
 ## Session Summary
 
 - **Date:** September 2026
