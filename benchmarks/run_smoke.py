@@ -8,7 +8,7 @@ Metrics recorded:
 - files/second
 - analysis/composition time (Phase 1: 0.0; filled by later phases)
 - peak memory (MiB, max RSS delta during scan + tracemalloc Python peak)
-- retained records (Phase 1: 0; filled by Phase 3 retention)
+- retained records (Phase 1: 0; Phase 3: bounded retention store result)
 - cancellation responsiveness (Phase 1: n/a; filled by Phase 8)
 
 Regression gate: a >20% regression versus the baseline in docs/ARCHITECTURE.md
@@ -87,7 +87,7 @@ def run_smoke(path: str, max_workers: int = 16) -> dict:
         "total_size_bytes": root.total_size,
         "peak_memory_mib": round(max(peak_rss["value"] - rss_before, 0.0), 2),
         "python_alloc_peak_mib": round(mem_peak / (1024 * 1024), 2),
-        "retained_records": 0,
+        "retained_records": scanner.records_retained,
         "cancellation_responsiveness_ms": None,
     }
 
