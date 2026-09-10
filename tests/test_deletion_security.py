@@ -165,6 +165,40 @@ def test_extended_length_prefix_equivalent():
         assert validate_delete_target(prefixed, scan_root=tmpdir).status == GuardStatus.OK
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Tier-0/critical paths are Windows-specific")
+def test_extended_length_prefix_cannot_bypass_tier0_protection():
+    r"""A \\?\-prefixed Tier-0/critical root must be DENIED inside a containing
+    scan root. Before the canonicalization fix these returned OK (the check
+    compared the raw \\?\-prefixed string against plain C:\... entries).
+    """
+    targets = [
+        r"C:\Program Files",
+        r"C:\Program Files (x86)",
+        r"C:\$Recycle.Bin",
+        r"C:\System Volume Information",
+        r"C:\Recovery",
+        r"C:\PROGRAM FILES",  # case variant of a critical root
+    ]
+    for raw in targets:
+        prefixed = "\\\\?\\" + raw
+        v = validate_delete_target(prefixed, scan_root="C:\\")
+        assert v.status in (
+            GuardStatus.DENIED_CRITICAL,
+            GuardStatus.DENIED_PROTECTED,
+        ), f"prefixed critical path not blocked: {prefixed} -> {v.status}"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Tier-0/critical paths are Windows-specific")
+def test_plain_critical_path_still_blocked_control():
+    """Positive control: the same roots WITHOUT the \\?\\ prefix are still DENIED."""
+    for raw in (r"C:\Program Files", r"C:\Windows\System32"):
+        v = validate_delete_target(raw, scan_root="C:\\")
+        assert v.status in (
+            GuardStatus.DENIED_CRITICAL,
+            GuardStatus.DENIED_PROTECTED,
+        ), f"plain critical path not blocked: {raw}"
+
+
 def test_no_blanket_260_character_cutoff():
     with tempfile.TemporaryDirectory() as tmpdir:
         long_name = "x" * 300
@@ -192,7 +226,8 @@ def test_spaces_and_special_characters_ok():
 
 def test_display_path_never_leaks_internal_prefix():
     assert "\\\\?\\" not in display_path(r"C:\Temp\some\folder")
-    assert "\\\\?\\" not in canonical_key(r"C:\Temp\some\folder") or True
+    key = canonical_key(r"C:\Temp\some\folder")
+    assert key is None or "\\\\?\\" not in key
 
 
 @needs_symlink

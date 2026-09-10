@@ -198,14 +198,18 @@ def validate_delete_target(
             )
 
     # Protected-path policy (includes the scan root via protected_roots).
-    if is_protected_path(path, protected_roots):
+    # Evaluated against the canonical identity (target_key), NOT the raw input,
+    # so extended-length (\\?\) and case-variant forms cannot bypass policy
+    # checks. The canonical key is the same reference form used for containment
+    # and root checks above.
+    if protected_roots and is_protected_path(target_key, protected_roots):
         return DeleteVerdict(
             GuardStatus.DENIED_PROTECTED, path, target_key,
             reason="protected root or ancestor of a protected root",
         )
 
-    # Critical system path policy.
-    if get_risk_level(path) == RiskLevel.CRITICAL:
+    # Critical system path policy — evaluated on the canonical identity as well.
+    if get_risk_level(target_key) == RiskLevel.CRITICAL:
         return DeleteVerdict(
             GuardStatus.DENIED_CRITICAL, path, target_key,
             reason="critical system path",
