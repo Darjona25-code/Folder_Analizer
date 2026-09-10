@@ -73,6 +73,7 @@ def test_delete_critical_folder_blocked():
 
 
 def test_delete_safe_folder(tmp_dir):
+    client.post("/api/scan", json={"path": tmp_dir})
     safe_path = os.path.join(tmp_dir, "sub2")
     response = client.post("/api/delete", json={"paths": [safe_path]})
     assert response.status_code == 200
@@ -90,6 +91,7 @@ def test_delete_nonexistent_folder():
 
 
 def test_delete_multiple_mixed(tmp_dir):
+    client.post("/api/scan", json={"path": tmp_dir})
     safe_path = os.path.join(tmp_dir, "sub1")
     response = client.post("/api/delete", json={
         "paths": [safe_path, "C:\\Windows\\System32", "Z:\\fake"]

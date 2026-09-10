@@ -11,9 +11,15 @@ from folder_analyzer.safety import (
     get_risk_level,
     get_risk_hex,
     is_deletable,
-    RiskLevel,
 )
-from folder_analyzer.deleter import is_protected_path
+from folder_analyzer.audit import DeletionAuditor
+from folder_analyzer.security_guard import (
+    GuardStatus,
+    display_path,
+    is_protected_path,
+    validate_delete_target,
+    revalidate,
+)
 from folder_analyzer.exporter import export_json, export_csv, export_html
 from folder_analyzer.i18n import I18n
 
@@ -61,13 +67,6 @@ def _get_last_scan_root(request: Request):
     return root
 
 
-def _protected_roots(request: Request) -> list[str]:
-    root = getattr(request.app.state, "last_scan_root", None)
-    if root is None:
-        return []
-    return [root.path]
-
-
 @router.post("/api/scan", response_model=ScanResponse)
 def scan_folder(req: ScanRequest, request: Request):
     path = os.path.normpath(req.path)
@@ -110,29 +109,67 @@ def get_folders(request: Request, limit: int = 50):
 def delete_folders(req: DeleteRequest, request: Request):
     deleted = []
     blocked = []
-    protected = _protected_roots(request)
+    root = getattr(request.app.state, "last_scan_root", None)
+    scan_root = getattr(root, "path", None) if root else None
+    protected = [scan_root] if scan_root else []
+    auditor = DeletionAuditor()
 
     for path in req.paths:
-        norm = os.path.normpath(path)
-        risk = get_risk_level(norm)
+        original = display_path(path)
+        verdict = validate_delete_target(path, scan_root=scan_root, protected_roots=protected)
 
-        if risk == RiskLevel.CRITICAL:
-            blocked.append(norm)
+        if verdict.status == GuardStatus.INVALID_INPUT:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error_code": "INVALID_PATH",
+                    "message": "Invalid path input",
+                    "path": original,
+                },
+            )
+
+        if verdict.status == GuardStatus.NOT_RESOLVABLE:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error_code": "UNRESOLVABLE_PATH",
+                    "message": verdict.reason,
+                    "path": original,
+                },
+            )
+
+        if verdict.status == GuardStatus.NOT_FOUND:
+            auditor.record(status="failure", original=original,
+                           canonical=verdict.canonical, reason=verdict.reason, success=False)
+            deleted.append(DeleteResult(
+                path=original, success=False, error="Path does not exist",
+                status="failure", reason=verdict.reason,
+            ))
             continue
 
-        if is_protected_path(norm, protected):
-            blocked.append(norm)
+        if verdict.denied:
+            auditor.record(status="denied", original=original,
+                           canonical=verdict.canonical, reason=verdict.reason, success=False)
+            blocked.append(original)
             continue
 
-        if not os.path.exists(norm):
-            deleted.append(DeleteResult(path=norm, success=False, error="Path does not exist"))
+        # Condition 6: final revalidation immediately before deletion.
+        final = revalidate(path, scan_root=scan_root, protected_roots=protected)
+        if not final.ok:
+            auditor.record(status="denied", original=original,
+                           canonical=verdict.canonical, reason=final.reason, success=False)
+            blocked.append(original)
             continue
 
         try:
-            send2trash(norm)
-            deleted.append(DeleteResult(path=norm, success=True))
+            send2trash(path)
+            auditor.record(status="success", original=original,
+                           canonical=verdict.canonical, reason=verdict.reason, success=True)
+            deleted.append(DeleteResult(path=original, success=True, status="success"))
         except Exception as e:
-            deleted.append(DeleteResult(path=norm, success=False, error=str(e)))
+            auditor.record(status="failure", original=original,
+                           canonical=verdict.canonical, reason=str(e), success=False)
+            deleted.append(DeleteResult(path=original, success=False, error=str(e), status="failure"))
 
     return DeleteResponse(
         deleted=deleted,

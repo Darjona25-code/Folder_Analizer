@@ -42,6 +42,8 @@ class DeleteResult(BaseModel):
     path: str
     success: bool
     error: str | None = None
+    status: str = "attempted"
+    reason: str | None = None
 
 
 class DeleteResponse(BaseModel):
