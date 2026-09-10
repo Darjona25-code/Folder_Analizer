@@ -1,10 +1,10 @@
 # Folder Analyzer — Architecture
 
-Status: **Phase 1 — scaffold only.** This document intentionally contains only the
-core/interface boundary, the current module map, the CLI/Web/Desktop relationship, and
-the benchmark baseline placeholder. File analysis/retention (§ Phase 3), performance
-(§ Phase 8), desktop (§ Phase 9/10), packaging (§ Phase 11), and localization (§ Phase 7)
-sections will be expanded in their respective phases.
+Status: **Phase 2 — scaffold + safety-model foundation.** This document intentionally
+contains only the core/interface boundary, the current module map, the CLI/Web/Desktop
+relationship, and the benchmark baseline placeholder. File analysis/retention
+(§ Phase 3), performance (§ Phase 8), desktop (§ Phase 9/10), packaging (§ Phase 11),
+and localization (§ Phase 7) sections will be expanded in their respective phases.
 
 ---
 
@@ -32,7 +32,7 @@ Interfaces:
 - **Desktop** (PySide6, Phase 9+) consumes the core **directly in-process**. There is
   **no** `Desktop → localhost FastAPI → Core` path.
 
-## 2. Current module map (Phase 1)
+## 2. Current module map (Phase 2)
 
 | Module | Responsibility | Boundary |
 |---|---|---|
@@ -40,7 +40,10 @@ Interfaces:
 | `folder_analyzer/deleter.py` | User-facing safe deletion flow (CLI-level) | Core (UI-agnostic; uses Rich only for CLI presentation) |
 | `folder_analyzer/security_guard.py` | Six-condition canonical deletion guard | Core — security boundary |
 | `folder_analyzer/audit.py` | Append-only JSON Lines deletion audit log | Core |
-| `folder_analyzer/safety.py` | Risk levels + protected path detection (v2 model; Phase 2 replaces with three-axis model) | Core |
+| `folder_analyzer/safety.py` | Risk levels + protected path detection (v2 model; superseded for assessment by the three-axis model) | Core |
+| `folder_analyzer/engine/enums.py` | Three-axis value spaces: `SystemImpact` / `DeletionRecommendation` / `ConfidenceLevel` | Core — safety model |
+| `folder_analyzer/engine/models.py` | Immutable `Assessment` + construction-time confidence gate (I9) with I3/I7 floors | Core — safety model boundary |
+| `folder_analyzer/engine/explain.py` | `reason_key` → localized EN/ES text (Phase 2 keys; full i18n migration is Phase 7) | Core |
 | `folder_analyzer/utils.py` | Size formatting, drive default | Core |
 | `folder_analyzer/treemap.py` | Treemap layout (presentation helper) | Core |
 | `folder_analyzer/reporter.py` | Rich reporting helpers | Core |
@@ -50,6 +53,10 @@ Interfaces:
 | `web/` | Static front-end (index.html, js, css) | Interface |
 | `benchmarks/` | Fixture generator + smoke benchmark (fixed baseline) | Tooling |
 | `tests/` | pytest suites | Tooling |
+
+Phase 2 adds the `folder_analyzer/engine/` safety-model foundation (enums,
+`Assessment`, confidence gate, explain). Nothing in the live scan/delete pipeline
+consumes it yet — the classifier/recommendation engine integrates in Phase 5.
 
 ## 3. CLI / Web / Desktop relationship
 
@@ -70,7 +77,7 @@ Input path ─► Scanner.scan(path) ─► FolderInfo tree
 
 Phase 3 adds per-file metadata, three-level content analysis, and the
 DISCOVERED/ANALYZED/RETAINED states. Phase 5 adds per-item and per-folder Safety
-assessments.
+assessments (emitted by the Phase 2 `engine/` value layer).
 
 ## 5. Deletion flow (Phase 1)
 

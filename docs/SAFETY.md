@@ -1,9 +1,10 @@
 # Folder Analyzer — Safety Model & Deletion Security
 
-Status: **Phase 1 — deletion-security foundation.**
-Sections 4–6 (three-axis safety model, invariants, composition) are defined in
-`docs/ROADMAP.md` and will be expanded here in **Phase 2 (model)** and **Phase 5
-(composition)**.
+Status: **Phase 2 — safety model foundation implemented.**
+The three-axis safety model (enums, `Assessment`, construction-time confidence
+gate, explainability) is implemented in Phase 2 and documented in §6 below.
+Folder-level composition and the live recommendation engine are **Phase 5
+(composition)** work.
 
 ---
 
@@ -111,7 +112,46 @@ merely because they were used for validation.
 - The security boundary relies exclusively on: canonical containment, protected-path
   checks, reparse-point validation, deletion authorization, and final validation.
 
-## 6. TOCTOU / race conditions (honest statement)
+## 6. Three-axis safety model (Phase 2 — implemented)
+
+Each item ultimately receives a single immutable `Assessment`. Folder-level
+aggregation arrives in Phase 5; Phase 2 defines the value space and its
+invariants.
+
+**Value spaces** (`folder_analyzer/engine/enums.py`):
+
+- `SystemImpact` — NONE / LOW / MODERATE / HIGH / CRITICAL / UNKNOWN
+- `DeletionRecommendation` — SAFE_TO_DELETE / REVIEW_FIRST / KEEP / DO_NOT_DELETE
+- `ConfidenceLevel` — HIGH / MEDIUM / LOW. Confidence is confidence **in the
+  classification**, not confidence in deletion safety (`docs/ROADMAP.md §5`).
+
+**`Assessment`** (`folder_analyzer/engine/models.py`) — frozen dataclass with
+fields `impact`, `recommendation`, `confidence`, `reason_key`, `reason_params`,
+`detected_category`, `app_id`, `is_user_data`, `is_temporary`.
+
+### Confidence gate (I9) — as implemented
+
+Enforced **inside construction** (`Assessment.__post_init__`), so the invalid
+combination is structurally unrepresentable — no post-hoc validator exists that
+could be skipped:
+
+```python
+def apply_confidence_gate(recommendation, confidence):
+    if recommendation == SAFE_TO_DELETE and confidence is not HIGH:
+        return REVIEW_FIRST
+    return recommendation
+```
+
+`__post_init__` applies the same gate plus the I3 (UNKNOWN impact) and I7
+(`is_user_data`) floors: both force `SAFE_TO_DELETE` → `REVIEW_FIRST` at
+construction. All of this is verified exhaustively in
+`tests/test_safety_invariants.py`.
+
+**Explainability** (`folder_analyzer/engine/explain.py`): Phase 2 `reason_key`
+strings resolve to localized EN/ES text following the `i18n.py` pattern. The
+full single-source i18n migration is Phase 7.
+
+## 7. TOCTOU / race conditions (honest statement)
 
 Canonicalization does not completely solve race conditions. This document states
 explicitly:
@@ -131,7 +171,7 @@ explicitly:
   semantics (e.g., Windows `FILE_FLAG_OPEN_REPARSE_POINT`); this is documented as future
   hardening and is out of scope for now.
 
-## 7. Deletion audit log
+## 8. Deletion audit log
 
 A lightweight, **append-only JSON Lines** log (`deletion_audit.jsonl` by default,
 overridable via configuration) recording, **per deletion attempt (including denied)**:
@@ -142,39 +182,65 @@ overridable via configuration) recording, **per deletion attempt (including deni
   normal user-facing path)
 - status: `success` / `denied` / `deferred` / `failure`
 - reason / error code
-- risk/assessment snapshot available at Phase 1 (risk level, phases 2+ will extend)
+- risk/assessment snapshot available at Phase 1 (risk level; Phase 5 pipes the
+  three-axis `Assessment` snapshot)
 
 The log is append-only; no in-place mutation.
 
-## 8. Safety invariants (recorded; fully implemented Phase 2/5)
+## 9. Safety invariants (Phase 1 deletion-security + Phase 2 model implemented)
 
-- **I1 — Core principle:** *"Uncertainty must reduce deletion authority, never increase it."*
-- **I2 — Positive evidence:** SAFE_TO_DELETE requires positive, high-confidence evidence. Prohibited chains listed in `docs/ROADMAP.md §6`.
-- **I3 — UNKNOWN (strict):** any UNKNOWN item/descendant ⇒ ≤ REVIEW_FIRST. `UNKNOWN_BLOCK = 0.0`.
-- **I4 — Containment:** deletion only inside the active scanned root.
-- **I5 — Root/ancestor protection.**
-- **I6 — Protected paths.**
-- **I7 — User value:** folders with personal/user-value content are never SAFE_TO_DELETE.
-- **I8 — Explainability:** every classification carries confidence + reason.
-- **I9 — Confidence gate:** SAFE_TO_DELETE requires HIGH confidence.
-- **I10 — Item-level authority:** item authority = the item's own Assessment; folder
-  recommendation gates only folder-as-a-whole actions.
+Status per invariant (implemented = enforced by code + covered by automated
+tests; `tests/test_safety_invariants.py` = Phase 2 model, Phase 1 suite =
+deletion security):
 
-## 9. Safety limitations
+- **I1 — Core principle** *(implemented)* — "Uncertainty must reduce deletion
+  authority, never increase it." Asserted exhaustively for UNKNOWN impact.
+- **I2 — Positive evidence** *(implemented as a Phase 2 contract)* — SAFE_TO_DELETE
+  requires positive, high-confidence evidence; no SAFE without HIGH confidence,
+  non-UNKNOWN impact, and a positive-evidence reason key. Prohibited chains in
+  `docs/ROADMAP.md §6`.
+- **I3 — UNKNOWN (strict)** *(item level implemented; folder level Phase 5)* — any
+  UNKNOWN item ⇒ ≤ REVIEW_FIRST; any folder with any UNKNOWN descendant ⇒ ≤
+  REVIEW_FIRST (folder aggregation is Phase 5). `UNKNOWN_BLOCK = 0.0` (Phases 5).
+- **I4 — Containment** *(implemented, Phase 1)* — deletion only inside the active
+  scanned root.
+- **I5 — Root/ancestor protection** *(implemented, Phase 1)*.
+- **I6 — Protected paths** *(implemented, Phase 1)*.
+- **I7 — User value** *(model floor implemented)* — personal/user-value content is
+  never SAFE_TO_DELETE; enforced by `is_user_data` at Assessment construction.
+- **I8 — Explainability** *(model foundation implemented)* — every classification
+  carries confidence + reason (`reason_key` → localized text via explain.py);
+  full UI/exports tooltips are Phase 7.
+- **I9 — Confidence gate** *(implemented)* — SAFE_TO_DELETE requires HIGH confidence;
+  enforced at Assessment construction, not post-hoc.
+- **I10 — Item-level authority** *(scaffold implemented; full test in Phase 5)* —
+  item authority = the item's own immutable `Assessment`; folder recommendation
+  gates only folder-as-a-whole actions (see `test_i10_*` in the Phase 2 suite).
+
+## 10. Safety limitations
 
 1. The Phase 1 guard proves containment and protected-path compliance; it does **not**
-   yet classify content (Phase 2+).
-2. Race-condition atomicity is bounded (§6); delete-by-handle hardening is future work.
+   yet classify content (the assessment engine is Phase 5).
+2. Race-condition atomicity is bounded (§7); delete-by-handle hardening is future work.
 3. Long-path handling depends on the runtime and OS long-path support; real edge cases
    are validated with the path-representation tests.
 4. Symlink/junction tests degrade gracefully where OS privileges prevent reparse-point
    creation.
+5. The Phase 2 three-axis `Assessment` is a pure value model: nothing in the CLI, API,
+   or web consumes it yet. Pipeline integration (scan-time assessments, folder
+   aggregation, delete UI gating) is Phase 5+.
 
-## 10. What Phase 2 will add
+## 11. What Phase 5 will add
 
-The three-axis model (System Impact / Deletion Recommendation / Confidence / Reason),
-the classifier/invariant engine, and the Confidence semantics. Section 4 of this
-document will then be rewritten from "recorded" to "implemented."
+- The full safety engine: classifier + recommendation engine evaluated at scan time.
+- Folder composition and folder-level aggregation: any folder with an UNKNOWN
+  descendant is at most REVIEW_FIRST (I3 folder level); a folder's derived
+  recommendation never overrides item-level authority (I10 full).
+- Knowledge-base integration (Phase 4) feeding `detected_category` / `app_id` and
+  rich reason provenance.
+- Composition thresholds (`SAFE_MIN_SHARE` 0.85 / `KNOWN_NON_DISPOSABLE_CEILING`
+  0.10 / `REVIEW_SHARE` 0.15 / `UNKNOWN_BLOCK` 0.0, per `docs/ROADMAP.md §5`) as
+  named constants.
 
 Scan-time `NOT_RESOLVABLE` surfacing (confidence flagging, "cannot be validated"
 status in scan output) is deliberately **deferred to Phase 3 (per-file analysis) /

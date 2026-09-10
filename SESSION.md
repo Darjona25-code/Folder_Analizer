@@ -66,3 +66,32 @@ folder-analyzer --path C:\
   commits pushed to `origin/master`.
 - **Next:** Phase 2 — Safety Engine Model (three-axis enums, invariants I1–I3/I9,
   Confidence semantics; no UI behavior change).
+
+## Phase 2 — Safety Engine Model (COMPLETED)
+
+- **Delivered** (`folder_analyzer/engine/`):
+  - `enums.py` — `SystemImpact` (NONE/LOW/MODERATE/HIGH/CRITICAL/UNKNOWN),
+    `DeletionRecommendation` (SAFE_TO_DELETE/REVIEW_FIRST/KEEP/DO_NOT_DELETE),
+    `ConfidenceLevel` (HIGH/MEDIUM/LOW).
+  - `models.py` — frozen `Assessment` dataclass (impact, recommendation, confidence,
+    reason_key/reason_params, detected_category, app_id, is_user_data, is_temporary).
+    Confidence gate (I9) enforced **inside `__post_init__`** (`SAFE_TO_DELETE` without
+    `HIGH` confidence → `REVIEW_FIRST`), plus I3 (UNKNOWN impact) and I7 (`is_user_data`)
+    floors — the invalid combination is structurally unrepresentable. `apply_confidence_gate`
+    exposed as a pure, idempotent function.
+  - `explain.py` — `reason_key` → localized EN/ES text (10 keys, `{param}` interpolation,
+    unknown keys fall back to the key), mirroring the `i18n.py` pattern.
+  - No FileEntry/ScanResult/FolderAggregation and **no pipeline integration** (as scoped).
+- **Tests:** `tests/test_safety_invariants.py` (I1, I2, I3-item, I7, I9 exhaustive,
+  I10 scaffold + immutability) + `tests/test_explain.py`. Suite grew **110 → 129 passed,
+  2 skipped**.
+- **Benchmark (scan path unchanged by Phase 2):** 0.92–0.94 s scan, ~53–54k files/s,
+  ~50.5–53.0 MiB peak RSS — within run-to-run variance of the Phase 1 baseline (gate: >20%
+  regression).
+- **Docs:** `docs/SAFETY.md` §6 (three-axis model as implemented + construction-time gate),
+  §9 status table I1–I10, §11 re-scoped to Phase 5 composition; `docs/ARCHITECTURE.md`
+  module map + flows now list `engine/`.
+- **Logs:** commit list includes a `feat(engine)` commit, a `test` commit, and a `docs`
+  commit (this one also updates CHANGELOG/SESSION); all pushed to `origin/master`.
+- **Next:** Phase 3 — File Analysis Engine (per-file metadata, three-level analysis,
+  DISCOVERED/ANALYZED/RETAINED states, scan-time NOT_RESOLVABLE surfacing).

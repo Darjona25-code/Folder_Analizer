@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Phase 2 — Safety Engine Model)
+
+- **Three-axis safety model foundation** (`folder_analyzer/engine/`): `enums.py`
+  — `SystemImpact` / `DeletionRecommendation` / `ConfidenceLevel` value spaces;
+  `models.py` — immutable `Assessment` (impact, recommendation, confidence,
+  `reason_key`/`reason_params`, `detected_category`, `app_id`, `is_user_data`,
+  `is_temporary`) with the confidence gate (I9), UNKNOWN-impact (I3) and
+  user-data (I7) floors enforced **at construction** — a
+  `SAFE_TO_DELETE`-without-`HIGH`-confidence Assessment is structurally
+  unrepresentable; `explain.py` — `reason_key` → localized EN/ES text
+  (following the `i18n.py` pattern).
+- **Safety invariants suite** (`tests/test_safety_invariants.py`): I1–I3 (item
+  level), I7, I9 (exhaustive over all combinations), I10 scaffold + Assessment
+  immutability; `tests/test_explain.py` for localized reason resolution. Suite
+  grew from 110 to **129 tests** (2 privilege-dependent skipped). Benchmark on
+  the unchanged scan path re-measured at ~0.92 s / ~54k files/s / ~50.5 MiB
+  peak RSS — within run-to-run variance of the Phase 1 baseline.
+- **Docs**: `docs/SAFETY.md` §6 documents the implemented three-axis model and
+  construction-time confidence gate, §9 now a status table I1–I10, §11 scopes
+  Phase 5 composition; `docs/ARCHITECTURE.md` adds `engine/` module map entries
+  and updates the Phase-numbered status/steps.
+
 ### Added (Phase 1 — Deletion Security)
 
 - **Canonical deletion guard** (`folder_analyzer/security_guard.py`): six-condition
