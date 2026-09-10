@@ -144,8 +144,11 @@ def apply_confidence_gate(recommendation, confidence):
 
 `__post_init__` applies the same gate plus the I3 (UNKNOWN impact) and I7
 (`is_user_data`) floors: both force `SAFE_TO_DELETE` → `REVIEW_FIRST` at
-construction. All of this is verified exhaustively in
-`tests/test_safety_invariants.py`.
+construction. **Reason coherence:** any such demotion also rewrites `reason_key`
+(/`reason_params`) to the cause of the demotion (`confidence_gate_promoted` /
+`uncertain` / `user_data`), so a `REVIEW_FIRST` result never carries a
+safe-to-delete rationale. All of this is verified in
+`tests/test_safety_invariants.py` (incl. exhaustive `itertools` products).
 
 **Explainability** (`folder_analyzer/engine/explain.py`): Phase 2 `reason_key`
 strings resolve to localized EN/ES text following the `i18n.py` pattern. The

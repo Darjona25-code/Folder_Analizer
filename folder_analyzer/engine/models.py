@@ -64,6 +64,9 @@ class Assessment:
         I9 — SAFE_TO_DELETE ⇒ HIGH confidence.
         I3 (item level) — UNKNOWN impact ⇒ at most REVIEW_FIRST.
         I7 — is_user_data ⇒ at most REVIEW_FIRST.
+    Reason/explainability coherence: when a requested SAFE_TO_DELETE is demoted
+    (I9/I3/I7), ``reason_key``/``reason_params`` are rewritten to the reason for
+    the demotion — a REVIEW_FIRST result never keeps a safe-to-delete rationale.
     """
 
     impact: SystemImpact
@@ -77,8 +80,28 @@ class Assessment:
     is_temporary: bool = False
 
     def __post_init__(self) -> None:
-        recommendation = apply_confidence_gate(self.recommendation, self.confidence)
-        if recommendation == DeletionRecommendation.SAFE_TO_DELETE:
+        requested = self.recommendation
+        recommendation = apply_confidence_gate(requested, self.confidence)
+        if recommendation is DeletionRecommendation.SAFE_TO_DELETE:
             if self.impact is SystemImpact.UNKNOWN or self.is_user_data:
                 recommendation = DeletionRecommendation.REVIEW_FIRST
+        reason_key = self.reason_key
+        reason_params = self.reason_params
+        if (
+            requested is DeletionRecommendation.SAFE_TO_DELETE
+            and recommendation is not DeletionRecommendation.SAFE_TO_DELETE
+        ):
+            if self.is_user_data:
+                reason_key, reason_params = "user_data", None
+            elif self.impact is SystemImpact.UNKNOWN:
+                reason_key, reason_params = "uncertain", None
+            else:
+                reason_key = "confidence_gate_promoted"
+                reason_params = {
+                    "confidence": " ".join(
+                        w.capitalize() for w in self.confidence.value.split("_")
+                    )
+                }
         object.__setattr__(self, "recommendation", recommendation)
+        object.__setattr__(self, "reason_key", reason_key)
+        object.__setattr__(self, "reason_params", reason_params)

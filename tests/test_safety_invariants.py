@@ -89,6 +89,44 @@ def test_i9_no_assessment_ever_has_safe_with_non_high():
             assert confidence is ConfidenceLevel.HIGH
 
 
+def test_i9_demotion_updates_reason_key():
+    """A SAFE->REVIEW_FIRST I9 demotion rewrites the reason to the demotion
+    cause, so a REVIEW_FIRST result never keeps a safe-to-delete rationale."""
+    a = Assessment(impact=SystemImpact.NONE, confidence=ConfidenceLevel.MEDIUM,
+                   reason_key="clean_system_data",
+                   recommendation=DeletionRecommendation.SAFE_TO_DELETE)
+    assert a.recommendation is DeletionRecommendation.REVIEW_FIRST
+    assert a.reason_key == "confidence_gate_promoted"
+    assert a.reason_params == {"confidence": "Medium"}
+
+
+def test_i3_demotion_updates_reason_key():
+    a = Assessment(impact=SystemImpact.UNKNOWN, confidence=ConfidenceLevel.HIGH,
+                   reason_key="clean_system_data",
+                   recommendation=DeletionRecommendation.SAFE_TO_DELETE)
+    assert a.recommendation is DeletionRecommendation.REVIEW_FIRST
+    assert a.reason_key == "uncertain"
+    assert a.reason_params is None
+
+
+def test_i7_demotion_updates_reason_key():
+    a = Assessment(impact=SystemImpact.NONE, confidence=ConfidenceLevel.HIGH,
+                   reason_key="clean_system_data",
+                   recommendation=DeletionRecommendation.SAFE_TO_DELETE,
+                   is_user_data=True)
+    assert a.recommendation is DeletionRecommendation.REVIEW_FIRST
+    assert a.reason_key == "user_data"
+    assert a.reason_params is None
+
+
+def test_no_demotion_keeps_reason_key():
+    a = Assessment(impact=SystemImpact.NONE, confidence=ConfidenceLevel.HIGH,
+                   reason_key="clean_system_data",
+                   recommendation=DeletionRecommendation.SAFE_TO_DELETE)
+    assert a.recommendation is DeletionRecommendation.SAFE_TO_DELETE
+    assert a.reason_key == "clean_system_data"
+
+
 def test_i3_item_unknown_never_safe():
     """Exhaustive: UNKNOWN impact ⇒ at most REVIEW_FIRST, never SAFE."""
     for confidence in ConfidenceLevel:

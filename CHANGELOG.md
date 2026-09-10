@@ -16,8 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `is_temporary`) with the confidence gate (I9), UNKNOWN-impact (I3) and
   user-data (I7) floors enforced **at construction** — a
   `SAFE_TO_DELETE`-without-`HIGH`-confidence Assessment is structurally
-  unrepresentable; `explain.py` — `reason_key` → localized EN/ES text
-  (following the `i18n.py` pattern).
+  unrepresentable; demotions from SAFE also rewrite `reason_key`/`reason_params`
+  to the demotion cause (I8 explainability coherence); `explain.py` —
+  `reason_key` → localized EN/ES text (following the `i18n.py` pattern).
 - **Safety invariants suite** (`tests/test_safety_invariants.py`): I1–I3 (item
   level), I7, I9 (exhaustive over all combinations), I10 scaffold + Assessment
   immutability; `tests/test_explain.py` for localized reason resolution. Suite
