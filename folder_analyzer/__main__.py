@@ -171,7 +171,11 @@ def action_delete(root: FolderInfo, top_folders: list[FolderInfo], i18n: I18n, c
     for p in selected_paths:
         console.print(f"  - {p}")
 
-    deleted = delete_folders(selected_paths, i18n, console, stats=stats, protected=[root.path])
+    deleted = delete_folders(
+        selected_paths, i18n, console,
+        stats=stats, protected=[root.path], scan_root=root.path,
+        audit_log="deletion_audit.jsonl",
+    )
     console.print(f"\n[green]{i18n.t('deleted_count', count=deleted)}[/green]")
 
 
