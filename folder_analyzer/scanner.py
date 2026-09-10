@@ -25,7 +25,7 @@ from .engine.models import FileEntry, FolderAggregation, ScanResult
 from .engine.retention import (
     RetainedFileStore,
     RetentionConfig,
-    select_folder_records,
+    select_folder_raw,
 )
 
 ProgressCallback = Callable[[int, int], None]
@@ -53,32 +53,6 @@ class FolderInfo:
             "children": [c.to_dict() for c in self.children],
             "error": self.error,
         }
-
-
-def _build_file_entry(entry: os.DirEntry, st) -> FileEntry:
-    """Build a metadata record from an os.scandir DirEntry + its stat result.
-
-    Zero additional syscalls: everything comes from ``entry`` (DirEntry scandir
-    cache: name, path, is_file/is_symlink flags) and from the ``st`` stat-result
-    the caller already fetched for the size (size, timestamps, mode/ino/nlink).
-    """
-    name = entry.name
-    _, extension = os.path.splitext(name)
-    return FileEntry(
-        path=entry.path,
-        filename=name,
-        extension=extension.lower(),
-        size=st.st_size,
-        created_ts=st.st_ctime,
-        modified_ts=st.st_mtime,
-        accessed_ts=st.st_atime,
-        attributes={
-            "st_mode": st.st_mode,
-            "st_ino": st.st_ino,
-            "st_nlink": st.st_nlink,
-            "is_symlink": entry.is_symlink(),
-        },
-    )
 
 
 class Scanner:
@@ -128,7 +102,7 @@ class Scanner:
             return
 
         subdirs: List[os.DirEntry] = []
-        file_records: List[FileEntry] = []
+        pending: List[Tuple[os.DirEntry, os.stat_result]] = []
         for entry in entries:
             try:
                 if entry.is_file(follow_symlinks=False):
@@ -138,7 +112,9 @@ class Scanner:
                         with self._lock:
                             self._inaccessible += 1
                         continue
-                    file_records.append(_build_file_entry(entry, st))
+                    # Cheap pair during traversal; the retention store builds
+                    # FileEntry objects only for the kept (RETAINED) subset.
+                    pending.append((entry, st))
                     info.direct_size += st.st_size
                     info.file_count += 1
                     with self._lock:
@@ -149,7 +125,8 @@ class Scanner:
                 continue
 
         with self._lock:
-            self._store.record_folder(os.path.normpath(path), file_records)
+            self._store.record_folder(os.path.normpath(path), pending)
+        pending.clear()
 
         if subdirs and use_threads and len(subdirs) > 4:
             self._scan_with_threads(info, subdirs)
@@ -234,19 +211,21 @@ class Scanner:
 
     def _rescan_folder_records(self, folder_path: str) -> Tuple[FileEntry, ...]:
         """Single-folder re-scan (direct files only) for evicted drill-down."""
-        records: List[FileEntry] = []
+        pending: List[Tuple[os.DirEntry, os.stat_result]] = []
         try:
             for entry in os.scandir(folder_path):
                 try:
                     if entry.is_file(follow_symlinks=False):
-                        records.append(
-                            _build_file_entry(entry, entry.stat(follow_symlinks=False))
+                        pending.append(
+                            (entry, entry.stat(follow_symlinks=False))
                         )
                 except (OSError, PermissionError):
                     continue
         except (PermissionError, OSError):
             return ()
-        return tuple(select_folder_records(records, self._retention_config.per_folder_cap))
+        return tuple(
+            select_folder_raw(pending, self._retention_config.per_folder_cap)
+        )
 
     def aggregation_for(self, folder_path: str) -> FolderAggregation:
         return self.scan_result().per_folder.get(os.path.normpath(folder_path))

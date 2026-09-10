@@ -224,7 +224,7 @@ def test_non_safe_records_survive_eviction_over_largest():
         _make_entry("C:\\f\\small1.bin", 10, assessment=keep),
         _make_entry("C:\\f\\small2.bin", 10, assessment=keep),
     ]
-    store.record_folder("C:\\f", entries)
+    store.add_entries("C:\\f", entries)
     retained_paths = {r.path for r in store.records_for_folder("C:\\f")}
     assert retained_paths == {"C:\\f\\small1.bin", "C:\\f\\small2.bin"}
 
@@ -232,7 +232,7 @@ def test_non_safe_records_survive_eviction_over_largest():
 def test_representative_sample_kept_even_if_smallest():
     """One representative per (folder, category) beats raw size."""
     store = RetainedFileStore(RetentionConfig(global_budget=1, per_folder_cap=3))
-    store.record_folder("C:\\f", [
+    store.add_entries("C:\\f", [
         _make_entry("C:\\f\\small_first.txt", 1),
         _make_entry("C:\\f\\huge.bin", 100),
         _make_entry("C:\\f\\mid.txt", 50),

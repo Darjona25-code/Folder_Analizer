@@ -24,8 +24,9 @@ reduces only ``records_retained``, never ``files_analyzed``.
 from __future__ import annotations
 
 import heapq
+import os
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Dict, Iterable, List, Set, Tuple
 
 from .enums import DeletionRecommendation
 from .models import AnalysisState, FileEntry
@@ -37,6 +38,78 @@ class RetentionConfig:
 
     global_budget: int = 10_000
     per_folder_cap: int = 200
+
+
+def build_file_entry(
+    entry: os.DirEntry,
+    st: os.stat_result,
+    *,
+    is_representative: bool = False,
+    analysis_state: AnalysisState = AnalysisState.ANALYZED,
+) -> FileEntry:
+    """Build a metadata record from a DirEntry + its already-fetched stat.
+
+    Zero additional syscalls: everything comes from the DirEntry scandir cache
+    (name, path, is_symlink) and from ``st`` — the same stat-result the caller
+    fetched for the file size.
+    """
+    name = entry.name
+    _, extension = os.path.splitext(name)
+    return FileEntry(
+        path=entry.path,
+        filename=name,
+        extension=extension.lower(),
+        size=st.st_size,
+        created_ts=st.st_ctime,
+        modified_ts=st.st_mtime,
+        accessed_ts=st.st_atime,
+        attributes={
+            "st_mode": st.st_mode,
+            "st_ino": st.st_ino,
+            "st_nlink": st.st_nlink,
+            "is_symlink": entry.is_symlink(),
+        },
+        is_representative=is_representative,
+        analysis_state=analysis_state,
+    )
+
+
+def select_folder_raw(
+    raw_items: Iterable[Tuple[os.DirEntry, os.stat_result]],
+    per_folder_cap: int,
+) -> List[FileEntry]:
+    """Pick the FileEntry records a single folder may contribute.
+
+    Materializes full FileEntry objects ONLY for the kept subset (the rest stay
+    analyzed-count-only, never allocated) — this keeps 50k-file scans cheap.
+    Selection mirrors ``select_folder_records``: one representative per category
+    (Phase 3: one "unknown" category -> the first record) plus the largest
+    files, capped by ``per_folder_cap``. Returned records are RETAINED.
+    """
+    if per_folder_cap <= 0:
+        return []
+    items = list(raw_items)
+    if not items:
+        return []
+    representative = items[0]
+    representative_idx = 0
+    remaining = per_folder_cap - 1
+    if remaining > 0:
+        rest = sorted(
+            items[1:],
+            key=lambda it: (-it[1].st_size, it[0].path),
+        )[:remaining]
+    else:
+        rest = []
+    picked: List[Tuple[os.DirEntry, os.stat_result, bool]] = [
+        (representative[0], representative[1], True)
+    ]
+    picked.extend((entry, st, False) for entry, st in rest)
+    return [
+        build_file_entry(entry, st, is_representative=rep,
+                         analysis_state=AnalysisState.RETAINED)
+        for entry, st, rep in picked
+    ]
 
 
 def _priority(entry: FileEntry) -> Tuple[int, int, int, str]:
@@ -144,15 +217,36 @@ class RetainedFileStore:
         self._owned_by: Dict[str, str] = {}
         self._folder_had_files: Set[str] = set()
 
-    def record_folder(self, folder_path: str, entries: Iterable[FileEntry]) -> int:
+    def record_folder(
+        self,
+        folder_path: str,
+        raw_items: Iterable[Tuple[os.DirEntry, os.stat_result]],
+    ) -> int:
         """Register a folder's analyzed records; returns how many were retained.
 
-        Trims the folder down to ``per_folder_cap`` (representatives first),
-        merges into the global budget and evicts lowest-priority records when
-        the budget is exceeded. Eviction here affects only the retained count,
-        never the ANALYZED count (owned by the scanner).
+        Trims the folder down to ``per_folder_cap`` (representatives first,
+        else largest), merges into the global budget and evicts lowest-priority
+        records when the budget is exceeded. Eviction here affects only the
+        retained count, never the ANALYZED count (owned by the scanner).
         """
-        selected = select_folder_records(entries, self.config.per_folder_cap)
+        selected = select_folder_raw(raw_items, self.config.per_folder_cap)
+        return self._record_selected(folder_path, selected)
+
+    def add_entries(
+        self,
+        folder_path: str,
+        entries: Iterable[FileEntry],
+    ) -> int:
+        """FileEntry-level entry point (Phase 5 classification feed / tests).
+
+        Applies the same per-folder cap + global priority eviction. The
+        scanner's bulk path uses ``record_folder`` with raw DirEntry/stat pairs
+        so FileEntry objects are only materialized for the kept subset.
+        """
+        return self._record_selected(folder_path, select_folder_records(
+            entries, self.config.per_folder_cap))
+
+    def _record_selected(self, folder_path: str, selected: List[FileEntry]) -> int:
         if selected:
             self._folder_had_files.add(folder_path)
         folder_paths = self._folder_paths.setdefault(folder_path, set())
