@@ -161,13 +161,13 @@ changed) re-evaluates from scratch. Deferred never means guessing, never means
 | Concern | Behavior (Case B) |
 |---|---|
 | Auto-retry | No. Single attempt. |
-| Scan classification | Record flagged `NOT_RESOLVABLE`; Confidence LOW; never implied safe or dangerous. |
-| Deletion result | **Denied.** |
-| In scan results | Retained with explicit "cannot be validated" status; excluded from deletable set. |
-| CLI | Explicit per-target message; counted as deferred; never implies success. |
-| API | `400` with `error_code: "UNRESOLVABLE_PATH"` + human-readable reason. |
-| Web / Desktop UI | Status "cannot be validated" + reason; delete disabled. |
-| Audit/result record | Outcome `deferred`, canonicalization attempt, reason. |
+| Deletion result | **Denied** at delete time — Phase 1 implements this path. |
+| Scan classification (Phase 1) | **NOT IMPLEMENTED in Phase 1.** A scan/analysis-time `NOT_RESOLVABLE` flag, Confidence value, and "cannot be validated" scan status are **Phase 3 (file analysis) / Phase 5 (recommendation engine)** work. The Phase 1 scanner does not flag `NOT_RESOLVABLE`; its only per-folder signal is the pre-existing `FolderInfo.error` field (permission/OS errors), not equivalent to a `NOT_RESOLVABLE` classification. |
+| Scan results (Phase 1) | No `NOT_RESOLVABLE`/confidence data surfaced in scan output; deferred to Phases 3/5. |
+| CLI | Explicit per-target message; counted as deferred; never implies success. (Implemented in Phase 1.) |
+| API | `400` with `error_code: "UNRESOLVABLE_PATH"` + human-readable reason. (Implemented in Phase 1.) |
+| Web / Desktop UI | NOT IMPLEMENTED. Status + reason + delete disabled are Phase 7 (web) / 9–10 (desktop) work; the API exposes `UNRESOLVABLE_PATH` for UIs to surface. |
+| Audit/result record | Outcome `deferred`, canonicalization attempt, reason. (Implemented in Phase 1.) |
 | Security bottom line | If canonical identity/containment cannot be safely established, deletion **must** be denied/deferred. |
 
 **Internal canonical paths vs user-facing paths.** `\\?\` extended forms and canonical

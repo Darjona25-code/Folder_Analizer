@@ -80,13 +80,13 @@ runtime/environment.
 | Concern | Behavior |
 |---|---|
 | Auto-retry | No. Single attempt, no backoff, no silent infinite retry. |
-| Scan classification | Record flagged `NOT_RESOLVABLE`; Confidence LOW; never implied safe or dangerous. |
-| Deletion result | **Denied.** Never falls back to an unsafe comparison. |
-| In scan results | Retained with explicit "cannot be validated" status; excluded from deletable set. |
-| CLI | Explicit per-target message ("cannot be safely validated — not deleted"); counted as deferred; never implies success. |
-| API | `400` with `error_code: "UNRESOLVABLE_PATH"` and a human-readable reason. |
-| Web / Desktop UI | Status "cannot be validated" + reason; delete control disabled. |
-| Audit/result record | Outcome `deferred`, canonicalization attempt, reason. |
+| Deletion result | **Denied** at delete time — Phase 1 implements this path. Never falls back to an unsafe comparison. |
+| Scan classification (Phase 1) | **NOT IMPLEMENTED in Phase 1.** A scan/analysis-time `NOT_RESOLVABLE` flag, a Confidence value, and a "cannot be validated" scan status are **Phase 3 (file analysis) / Phase 5 (recommendation engine)** work. The Phase 1 scanner does not flag `NOT_RESOLVABLE`; its only per-folder signal is the pre-existing `FolderInfo.error` field (permission/OS errors), which is **not equivalent** to a `NOT_RESOLVABLE` classification and must not be read as one. |
+| Scan results (Phase 1) | No `NOT_RESOLVABLE`/confidence data is surfaced in scan output. See the row above — deferred to Phases 3/5. |
+| CLI | Explicit per-target message ("cannot be safely validated — not deleted"); counted as deferred; never implies success. (Implemented in Phase 1.) |
+| API | `400` with `error_code: "UNRESOLVABLE_PATH"` and a human-readable reason. (Implemented in Phase 1.) |
+| Web / Desktop UI | NOT IMPLEMENTED. Status "cannot be validated" + reasoning + delete control disabled are Phase 7 (web) / Phase 9–10 (desktop) work; the API already exposes `UNRESOLVABLE_PATH` for UIs to surface. |
+| Audit/result record | Outcome `deferred`, canonicalization attempt, reason. (Implemented in Phase 1.) |
 | Security bottom line | If canonical identity and containment cannot be safely established, deletion **must** be denied/deferred. |
 
 ## 4. Internal canonical paths vs user-facing paths
@@ -175,3 +175,9 @@ The log is append-only; no in-place mutation.
 The three-axis model (System Impact / Deletion Recommendation / Confidence / Reason),
 the classifier/invariant engine, and the Confidence semantics. Section 4 of this
 document will then be rewritten from "recorded" to "implemented."
+
+Scan-time `NOT_RESOLVABLE` surfacing (confidence flagging, "cannot be validated"
+status in scan output) is deliberately **deferred to Phase 3 (per-file analysis) /
+Phase 5 (recommendation engine)** — see the §3 matrix: Phase 1 implements only
+delete-time `NOT_RESOLVABLE` handling. The `FolderInfo.error` field is pre-existing
+and is not a `NOT_RESOLVABLE` classification.
