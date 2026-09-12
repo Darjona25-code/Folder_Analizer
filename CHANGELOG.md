@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Phase 4 — Knowledge Base, standalone / not wired)
+
+- **Tiered knowledge base** (`folder_analyzer/engine/kb/`, roadmap §10; approved
+  location beside the other engine modules): ordered path-classification dispatch
+  that returns a single `KBResult(category, tier, confidence_hint, level, detail)`.
+  Tiers run 0→5, first match wins:
+  - **Tier 0** `known_paths.py` — critical/system paths; `_EXACT` (drive root,
+    exact-match only, binary search over sorted tables) + `_TREE` (SystemRoot /
+    System32 / SysWOW64 / Program Files / ProgramData / `$Recycle.Bin` / System
+    Volume Information / Recovery — containment).
+  - **Tier 1** `env_paths.py` — `USERPROFILE`/`APPDATA`/`LOCALAPPDATA`/
+    `PROGRAMDATA`/`PROGRAMFILES`/`WINDIR`/`TEMP`/`TMP` + Known Folders
+    (Downloads/Documents/Desktop/… via `SHGetKnownFolderPath`, ctypes), resolved
+    in most-specific-first order and cached **once per scan session**.
+  - **Tier 2** `categories.py` — component patterns (browser → dev → ai_ml →
+    game → docker → cache; browser evidence precedes the generic cache bucket).
+  - **Tier 3** `categories.py` — curated extension table (temp/system/documents/
+    media/archives/databases/config, ~90 entries); evaluated before Tiers 4–5.
+  - **Tier 4** `apps.py` — `app:ollama` / `app:docker` / `app:python` /
+    `app:node` / `app:browser`, reached only when no earlier tier matched.
+  - **Tier 5** `registry.py` — optional Windows Uninstall catalog (HKLM
+    64/32-bit + HKCU), **batch-loaded once per session** (roadmap §10 convention),
+    safe-empty on any failure, never a hard dependency.
+- **Bounded content levels** (`content.py`, only via `kb.classify_content(path,
+  level)`): Level 2 (≤512 B) magic-byte registry; Level 3 (≤4 KB) rare/justified
+  SQLite windowed re-confirmation + Ollama-manifest detection (path must contain
+  `ollama`+`manifests` and OCI JSON fields). No full-file read path anywhere;
+  a >100 MB file is proved (instrumented) to consume ≤512 B / ≤4 KB.
+- **Unknown stays unknown:** no tier match → `unknown` / `tier=None` /
+  `confidence_hint=low`; `KBResult` has no assessment/recommendation fields — the
+  KB never constructs `Assessment` objects (asserted by tests).
+- **Session caches** reset via `kb.reset_session_caches()` (scan boundaries);
+  count-proven single batch per session for Known Folder resolution and registry.
+- **Memory discipline:** all tier tables are module-level constants loaded once
+  (~tens of KB, <100 KB total); nothing KB lives in the scan hot path.
+- **Tests:** `tests/test_knowledge_base.py` (31 tests: tier-by-tier correctness,
+  Tier-0 exact-vs-tree + binary-search, dispatch first-match-wins incl. Tier-3
+  short-circuit of Tier 4, caching counting proofs, bounded-read sparse-file
+  proofs, unknown-stays-unknown). Suite grew **148 → 179 passed, 2 skipped**.
+- **Scan-path regression check:** `scanner.py` is byte-identical to Phase 3; the
+  KB is not imported by any scan/delete code. Six-run smoke benchmark
+  `1.001–1.495 s` (best run at/under the Phase-3 baseline; spread is machine
+  noise) — details + JSON artifacts in `docs/ARCHITECTURE.md` §6.
+- **Docs:** `docs/ARCHITECTURE.md` (KB model §2 + module map + memory footprint +
+  RSS trend status + Phase-4 benchmark row / artifacts), `docs/SAFETY.md`
+  (categories-not-Assessments confirmation; L2/L3 implemented but standalone at
+  scan time), `docs/ROADMAP.md` Phase 4 → COMPLETE.
+
 ### Added (Phase 3 — File Analysis & Data Model)
 
 - **Per-file Level-1 metadata** (`folder_analyzer/scanner.py`, `engine/models.py`

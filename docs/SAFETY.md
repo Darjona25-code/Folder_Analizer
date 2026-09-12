@@ -1,11 +1,15 @@
 # Folder Analyzer — Safety Model & Deletion Security
 
-Status: **Phase 3 — metadata/retention foundation implemented; no classification.**
+Status: **Phase 4 — Knowledge Base implemented (standalone, not wired).**
 The three-axis safety model (enums, `Assessment`, construction-time confidence
 gate, explainability) is implemented in Phase 2 and documented in §6. Phase 3
-adds per-file metadata + bounded retention (Level-1 analysis only). Folder-level
-composition and the live recommendation engine are **Phase 5 (composition)**
-work; content-signature detection is Phase 4.
+adds per-file metadata + bounded retention (Level-1 analysis only). Phase 4
+adds the Knowledge Base (`folder_analyzer/engine/kb/`): tiered **path**
+classification plus **bounded Level 2/3 content** detection, exposed as
+`KBResult` objects. The KB is **not integrated into any scan/delete path**:
+it produces categories only, never `Assessment` objects, and nothing in
+`scanner.py` imports it. Folder-level composition and the live recommendation
+engine are **Phase 5 (composition)** work.
 
 ---
 
@@ -155,7 +159,7 @@ safe-to-delete rationale. All of this is verified in
 strings resolve to localized EN/ES text following the `i18n.py` pattern. The
 full single-source i18n migration is Phase 7.
 
-### Content-analysis levels & retention (Phase 3 status)
+### Content-analysis levels & retention (Phase 4 status)
 
 - **Level 1 (metadata/path, no file I/O) is implemented** by the scanner
   (`folder_analyzer/scanner.py`, `engine/models.py` `FileEntry`): per-file
@@ -163,8 +167,14 @@ full single-source i18n migration is Phase 7.
   with **zero additional syscalls** (reuses the single `entry.stat()` per file).
   Records stay `category="unknown"` and `assessment=None`.
 - **Level 2 (magic bytes, ≤512 B) and Level 3 (targeted bounded inspection,
-  ≤4 KB) are NOT implemented.** They are Phase 4 (Knowledge Base) work — no code
-  path reads file contents in Phase 3.
+  ≤4 KB) are implemented** inside the KB package (`folder_analyzer/engine/kb/content.py`)
+  but are **standalone only** — reachable via `kb.classify_content(path, level)`,
+  never called by the scanner. Level 2 resolves ambiguous/extensionless types by
+  bounded prefix reads; Level 3 re-confirms SQLite within the window and detects
+  Ollama manifests (paths containing `ollama`+`manifests` + OCI JSON fields ≤4 KB).
+  Both levels are proved by an instrumented bounded-read test on a >100 MB sparse
+  file (≤512 B / ≤4 KB respectively). The scanner never reads file contents
+  (analysis/composition time stays 0.0 in the benchmark).
 - **Bounded retention** (`engine/retention.py`): configurable global budget
   (default 10,000 records) and per-folder cap (default 200); priority
   non-safe → representative → largest → path. **In Phase 3 the non-safe
@@ -259,10 +269,14 @@ deletion security):
 5. The Phase 2 three-axis `Assessment` is a pure value model: nothing in the CLI, API,
    or web consumes it yet. Pipeline integration (scan-time assessments, folder
    aggregation, delete UI gating) is Phase 5+.
-6. Phase 3 file analysis is **metadata only (Level 1)**: per-file `FileEntry`
-   records carry no classification, no signatures, and no content reads. The
-   default `unknown` category and zeroed `by_*` aggregations must never be read
-   as safety signals.
+6. Phase 3/4 file analysis is **metadata only (Level 1)** at scan time. The KB
+   package (Phase 4) *can* classify paths and bounded content prefixes, but it is
+   not wired into scans, so per-`FileEntry` records still carry no classification,
+   no signatures, and the scanner performs no content reads. The default `unknown`
+   category and zeroed `by_*` aggregations must never be read as safety signals.
+   Confirmed: **the KB produces `KBResult` categories only — it never constructs
+   `Assessment` objects or `SAFE_TO_DELETE`-style recommendations** (KBResult has
+   no assessment/recommendation fields; asserted by tests).
 
 ## 11. What Phase 5 will add
 

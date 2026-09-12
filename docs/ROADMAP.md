@@ -1,6 +1,6 @@
 # Folder Analyzer — Master Roadmap v3.0
 
-Status: **APPROVED — Phases 1–3 complete, Phase 4 next.**
+Status: **APPROVED — Phases 1–4 complete (Phase 4: Knowledge Base, standalone not wired), Phase 5 next.**
 Version of this document: Phase 1 baseline commit.
 
 This is the implementation contract for the project. It is the single, internally
@@ -494,6 +494,23 @@ Fixed process (re-affirmed):
 - **Acceptance criteria:** deterministic; every rule has id + reason; registry optional proven.
 - **Risks:** rule-coverage inflation (capped high-value only).
 - **Estimated effort:** 6–10 h. **Uncertainty:** Medium.
+- **Status: COMPLETE — approved scope delivered.** Implementation location is
+  `folder_analyzer/engine/kb/` (approved deviation from `folder_analyzer/kb/` to
+  sit beside the other engine modules). Commits `f41d85c` (feat), `9253a5b` (test;
+  surfaced fixes: registry `_catalog()` safe-empty hardening, Tier-2 browser-before-cache
+  ordering). Evidence in `tests/test_knowledge_base.py` (31 tests): tier-by-tier
+  correctness; dispatch first-match-wins 0→5; Known Folder resolution + registry both
+  batch once per session (counting tests); bounded-read proof on a >100 MB file
+  (≤512 B L2 / ≤4 KB L3); unknown stays unknown (no Assessment/recommendation surface).
+  Scanner hot path untouched (`scanner.py` byte-identical; benchmark analysis/composition
+  time 0.0); six-run benchmark `1.001–1.495 s` (best run at/under the Phase-3 baseline;
+  spread is machine noise — see `docs/ARCHITECTURE.md §6`). Full suite **179 passed /
+  2 skipped**. KB memory footprint ~tens of KB (<100 KB), documented in ARCHITECTURE;
+  RSS status carries forward from Phase 3 (+18.2%, ~1.8pp headroom, watch at Phase 5
+  wiring, address at Phase 8). Dispatch reachability limits (Tier-3 extension
+  short-circuits Tier 4 for mapped extensions; Ollama manifest attribution is a Level 3
+  content check) documented in ARCHITECTURE §2 and the `categories.py`/`content.py`
+  module docstrings.
 
 ### Phase 5 — Recommendation Engine + Folder Composition + ScanResult
 - **Objective:** item-level assessment implementing I1–I3/I9 positive evidence; §11 composition (short-circuit R1–R6); integrated ScanResult.

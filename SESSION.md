@@ -134,3 +134,43 @@ folder-analyzer --path C:\
   `docs` (Phase 3). Pushed to `origin/master`.
 - **Next:** Phase 4 — Knowledge Base (Levels 2/3 content detection as re-scoped,
   signature registers, optional foundation-data feeds).
+
+## Phase 4 — Knowledge Base (COMPLETED — standalone, not wired)
+
+- **Delivered** (approved scope, location `folder_analyzer/engine/kb/` per approval):
+  - T0 `known_paths.py` — critical/system paths; `_EXACT` (drive root, exact-match
+    only, bisect over sorted tables) + `_TREE` (SystemRoot/System32/SysWOW64/
+    ProgramFiles/ProgramData/`$Recycle.Bin`/System Volume Information/Recovery).
+  - T1 `env_paths.py` — env vars + Known Folders (`SHGetKnownFolderPath`, ctypes,
+    win32 only), most-specific-first (Downloads/Documents/Desktop before
+    USERPROFILE), resolved **once per scan session**.
+  - T2 `categories.py` — component patterns in order browser → dev → ai_ml → game →
+    docker → cache; T3 curated extension table (~90 entries, material only);
+    T3 evaluated before Tiers 4–5 (extension evidence short-circuits T4).
+  - T4 `apps.py` — `app:ollama` / `app:docker` / `app:python` / `app:node` /
+    `app:browser` (anchors deliberately absent from T2 so dispatch reaches T4).
+  - T5 `registry.py` — Uninstall catalog, batch-loaded once/session, safe-empty;
+    `content.py` — Level 2 (≤512 B) magic + Level 3 (≤4 KB) SQLite windowed /
+    Ollama-manifest (path must contain `ollama`+`manifests`); no full-file read path.
+  - `kb/__init__.py` dispatcher: tiers 0→5, first non-None wins, else
+    `unknown`/`tier=None`/`low`. `KBResult` carries category/tier/confidence_hint/
+    level/detail; **never constructs Assessment**; `kb.reset_session_caches()`.
+- **Test-driven fixes surfaced by the 31 new tests:** registry `_catalog()` hardened
+  to safe-empty even when `_batch_load` raises; Tier-2 order changed so browser
+  evidence precedes generic cache (`Chrome\Cache` → browser).
+- **Tests:** `tests/test_knowledge_base.py` (31 tests). Suite grew **148 → 179 passed,
+  2 skipped**.
+- **Benchmark (scan path byte-identical to Phase 3 — no KB import in scanner; analysis/
+  composition time still 0.0):** six runs `1.001–1.495 s`, files/s `33,455–49,973`,
+  RSS `58.8–78.3` MiB. Spread is machine noise (±25%); best run 1.001 s is at/under the
+  Phase-3 baseline. Artifacts `benchmarks/results/smoke-phase4-r1..6.json`; row in
+  `docs/ARCHITECTURE.md` §6.
+- **Docs:** `docs/ARCHITECTURE.md` (status + module map + KB model + memory footprint
+  ~tens of KB / <100 KB + RSS trend status + Phase-4 benchmark), `docs/SAFETY.md`
+  (categories-not-Assessments confirmation; L2/L3 implemented but standalone),
+  `docs/ROADMAP.md` Phase 4 → COMPLETE, `CHANGELOG.md` [Unreleased].
+- **Logs:** `feat(kb)` (`f41d85c`), `test(kb)` (`9253a5b`), `docs` (Phase 4). Pushed to
+  `origin/master`.
+- **Next:** Phase 5 — Recommendation Engine + Folder Composition + ScanResult (wire the
+  KB into per-item/per-folder Assessment; I1–I3/I9 positive evidence; composition
+  short-circuits R1–R6). Watch RSS headroom (~1.8pp to the 20% gate).
