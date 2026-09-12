@@ -98,7 +98,10 @@ def _batch_load() -> Dict[str, str]:
 def _catalog() -> Dict[str, str]:
     global _CATALOG
     if _CATALOG is None:
-        _CATALOG = _batch_load()  # safe-empty: never raises
+        try:
+            _CATALOG = _batch_load()
+        except Exception:
+            _CATALOG = {}  # safe-empty: registry refresh must never raise
     return _CATALOG
 
 

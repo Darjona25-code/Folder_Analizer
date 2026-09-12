@@ -1,7 +1,7 @@
 """Tiers 2 & 3 — common user/app data categories and extension categories.
 
-Tier 2 (path patterns): caches/temp, Docker data, games, browsers, dev
-tooling, AI/ML. Matching is against whole path *components* (casefolded), so a
+Tier 2 (path patterns): browsers, dev tooling, AI/ML, games, Docker data,
+caches/temp. Matching is against whole path *components* (casefolded), so a
 file named ``notes.txt`` never trips a directory marker; only an actual
 ``cache``/``steam``/… directory name does.
 
@@ -29,14 +29,10 @@ from ._norm import components, norm
 from .result import KBResult
 
 # Tier 2 — component-name pattern table (order matters: first match wins).
+# Browser evidence precedes generic cache evidence so `Chrome\Cache` /
+# `firefox\Cache2` classify as "browser" (the largest reclamation source),
+# not the generic "cache" bucket.
 _TIER2_PATTERNS: "tuple[tuple[str, frozenset[str]], ...]" = (
-    ("cache", frozenset({"cache", "caches", ".cache", "temp", "tmp", "__pycache__", ".gradle"})),
-    ("docker", frozenset({"docker", "containerd", "overlay2", "com.docker.service"})),
-    ("game", frozenset({
-        "steam", "steamapps", "steamcmd",
-        "epic games", "battlenet", "blizzard", "riot games",
-        "ea games", "ubisoft", "gog", "gog galaxy", "playnite",
-    })),
     ("browser", frozenset({
         "chrome", "chromium", "brave-browser", "brave", "opera", "vivaldi",
         "firefox", "mozilla", "microsoftedge", "safari",
@@ -49,6 +45,13 @@ _TIER2_PATTERNS: "tuple[tuple[str, frozenset[str]], ...]" = (
         "huggingface", "checkpoints", "weights", "gguf", "diffusers",
         "stable-diffusion", "comfyui", "invokeai", "automatic1111", "lora",
     })),
+    ("game", frozenset({
+        "steam", "steamapps", "steamcmd",
+        "epic games", "battlenet", "blizzard", "riot games",
+        "ea games", "ubisoft", "gog", "gog galaxy", "playnite",
+    })),
+    ("docker", frozenset({"docker", "containerd", "overlay2", "com.docker.service"})),
+    ("cache", frozenset({"cache", "caches", ".cache", "temp", "tmp", "__pycache__", ".gradle"})),
 )
 
 # Tier 3 — extension category table (lowercased, with leading dot).
