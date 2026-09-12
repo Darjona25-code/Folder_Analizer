@@ -167,9 +167,13 @@ full single-source i18n migration is Phase 7.
   path reads file contents in Phase 3.
 - **Bounded retention** (`engine/retention.py`): configurable global budget
   (default 10,000 records) and per-folder cap (default 200); priority
-  non-safe → representative → largest → path. In Phase 3 the non-safe signal is
-  inert (nothing is classified yet); it is implemented and tested with synthetic
-  Assessments so it activates automatically in Phase 5.
+  non-safe → representative → largest → path. **In Phase 3 the non-safe
+  component is a structural placeholder whose input is always identical:**
+  the scanner sets `assessment=None` on every `FileEntry`, and `_priority`
+  only evaluates `non_safe` when `assessment is not None` — so it returns `0`
+  for all records today and discriminates nothing. It is implemented and
+  tested with synthetic Assessments (so it activates automatically in Phase 5)
+  but must not be treated as validated by Phase 3 data.
 - **Three-stage lifecycle:** ANALYZED always covers **100% of accessible files**;
   RETAINED is the bounded subset. Eviction reduces `records_retained` only —
   never `files_analyzed`. Folders whose records were evicted are re-analyzed on

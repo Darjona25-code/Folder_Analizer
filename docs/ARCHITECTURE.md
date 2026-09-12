@@ -103,10 +103,17 @@ Input path ─► Scanner.scan(path) ─► FolderInfo tree  (+ ScanResult via s
   ambiguous-type resolution actually needs them. No code path reads file *contents*.
 - **Inaccessible files** (permission/OS errors) are counted separately
   (`inaccessible_count`); they are not part of `files_analyzed`.
-- **Retention relevance is intentionally inert in Phase 3:** nothing is classified, so
-  no record is ever non-safe; the `non-safe → representative → largest` priority is
-  implemented and unit-tested with synthetic Assessments and becomes live automatically
-  when Phase 5 attaches real ones.
+- **Retention relevance (non-safe) is a structural placeholder in Phase 3 — NOT
+  validated by real data.** `_priority` computes `non_safe` only when
+  `entry.assessment is not None`; Phase 3 attaches no assessments
+  (`FileEntry.assessment is None` for *every* record), so the `non_safe`
+  component evaluates to `0` for **all** FileEntry instances — it cannot
+  discriminate anything and adds no signal today. The eviction order, when
+  assessments exist, is implemented and unit-tested with synthetic Assessments
+  (see `test_non_safe_records_survive_eviction_over_largest`); it becomes live
+  automatically when the Phase 5 engine attaches real Assessment objects. This
+  placeholder must not be read as "validated" — it has no discriminating input
+  until Phase 5.
 - **On-demand re-analysis:** drilling into a folder whose records were evicted triggers
   a single-folder re-scan (`Scanner.records_for`) that re-reads that folder from disk.
 
@@ -140,6 +147,14 @@ end of every phase. Per-phase results are logged here (append-only table).
 | 2 | 0.919 | 54,386 | 50.54 (RSS delta; alloc peak 19.32) | 0 | **Phase-3 reference baseline** (post-security-fix close; engine value layer, scan path untouched) |
 | 3 | 1.054 | 47,437 | 59.75 (RSS delta; alloc peak 21.85) | 7,400 | Level-1 metadata + bounded retention (default caps 10,000/200); +14.7% time vs Phase 2 — regression investigation: an initial all-FileEntry materialization measured **2.109 s / 105 MB**, fixed by lazy retention-only materialization (1.046/1.054 s across two runs) |
 | … | | | | | |
+
+> **RSS trend watch (Phase 3 close):** peak RSS *decreased* −0.1% at the end of
+> Phase 2 versus its own phase reference, but *increased* **+18.2%** in Phase 3
+> versus the Phase-2 reference (59.75 vs 50.54 MiB) — close to the 20% gate. This
+> trend must be watched closely in **Phase 4** (the Knowledge Base adds more
+> in-memory structures — signature registers, type metadata) and formally
+> addressed in **Phase 8 (Performance & Scale)** if it keeps climbing. The
+> available headroom is ~1.8 percentage points before the gate.
 
 Regression policy: a `>20%` regression vs the documented baseline is a **phase-closing
 gate** (stop → investigate → fix/justify → re-run; do not close until resolved or
