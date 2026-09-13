@@ -26,6 +26,7 @@ positive guess. This honors I1 (uncertainty never increases deletion authority).
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Dict, Optional
 
@@ -35,8 +36,8 @@ from .enums import (
     DeletionRecommendation,
     SystemImpact,
 )
-from .kb import classify as kb_classify
-from .kb._norm import components
+from .kb import classify as kb_classify, classify_scan_path
+from .kb._norm import components, norm
 from .models import Assessment, FileEntry
 
 __all__ = [
@@ -280,6 +281,13 @@ _REASON_BY_BUCKET: "dict[CompositionBucket, str]" = {
     CompositionBucket.UNKNOWN: "unknown_impact",
 }
 
+# ScanAssessment is a fully immutable record whose fields are a pure function
+# of (detected_category, bucket). Sharing one instance per distinct verdict
+# preserves value semantics (I10 item authority reads fields only) while
+# removing per-file dataclass construction from the 50k-file scan path and the
+# associated allocation peak.
+_SCAN_RECORDS: "dict[tuple[str, CompositionBucket], ScanAssessment]" = {}
+
 
 def classify_path(
     path: str,
@@ -310,9 +318,17 @@ def classify_scan(
     *,
     filename: Optional[str] = None,
     not_resolvable: bool = False,
+    _ctx: "Optional[ScanFolderContext]" = None,
 ) -> ScanAssessment:
     """Classification record for the scan path (allocation-lean; see
-    ``ScanAssessment``). Same verdict as ``classify_path`` by construction."""
+    ``ScanAssessment``). Same verdict as ``classify_path`` by construction.
+
+    ``_ctx`` is the per-folder ``kb.ScanFolderContext`` from
+    ``prepare_scan_folder``: when supplied, the scan hot path reuses the
+    folder's pre-resolved tiers 0/1/5 and shareable component list instead of
+    re-running every tier per file. The verdict is byte-identical to the
+    standalone path (``kb.classify``), which remains the default.
+    """
     if not_resolvable:
         return ScanAssessment(
             impact=SystemImpact.UNKNOWN,
@@ -326,7 +342,16 @@ def classify_scan(
             is_temporary=False,
             bucket=CompositionBucket.UNKNOWN,
         )
-    kb_result = kb_classify(path)
+    if _ctx is not None:
+        if filename is not None and os.altsep not in filename \
+                and os.sep not in filename and filename not in (".", ".."):
+            file_key = _ctx.folder_key + os.sep + filename.lower()
+        else:
+            file_key = norm(path)
+        file_name = filename if filename is not None else os.path.basename(path)
+        kb_result = classify_scan_path(_ctx, file_key=file_key, file_name=file_name)
+    else:
+        kb_result = kb_classify(path)
     policy = _policy_for(kb_result.category)
 
     # ``browser`` paths under an explicit disposable marker directory
@@ -348,18 +373,23 @@ def classify_scan(
     elif kb_result.category == "app":
         app_id = "installed"
 
-    return ScanAssessment(
-        impact=policy.impact,
-        confidence=policy.confidence,
-        reason_key=_REASON_BY_BUCKET[bucket],
-        recommendation=policy.recommendation,
-        reason_params=None,
-        detected_category=kb_result.category,
-        app_id=app_id,
-        is_user_data=policy.is_user_data,
-        is_temporary=policy.is_temporary,
-        bucket=bucket,
-    )
+    memo_key = (kb_result.category, bucket)
+    rec = _SCAN_RECORDS.get(memo_key)
+    if rec is None:
+        rec = ScanAssessment(
+            impact=policy.impact,
+            confidence=policy.confidence,
+            reason_key=_REASON_BY_BUCKET[bucket],
+            recommendation=policy.recommendation,
+            reason_params=None,
+            detected_category=kb_result.category,
+            app_id=app_id,
+            is_user_data=policy.is_user_data,
+            is_temporary=policy.is_temporary,
+            bucket=bucket,
+        )
+        _SCAN_RECORDS[memo_key] = rec
+    return rec
 
 
 def assessment_from_scan_record(record: ScanAssessment) -> Assessment:

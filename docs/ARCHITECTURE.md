@@ -260,17 +260,31 @@ Direct, unmassaged measurements (pinned P-cores, deterministic 50k fixture), re-
 
 | Measurement | Phase 4 (`7bacf54`) | Phase 5 (HEAD) | note |
 |---|---|---|---|
-| runner scan, tracemalloc ON | 0.983, 1.002 s | 4.204–4.310 s | harness gate runs |
-| GATE alloc-peak, tracemalloc ON | 12.49, 12.61 MiB | 13.13–14.37 MiB (n=4) | mean 13.68 vs baseline mean 12.01 = **+13.9%** |
-| runner scan, tracemalloc OFF | 0.151, 0.137, 0.142 s (mean 0.143) | 0.787, 0.778, 0.783, 0.779 s (mean 0.782) | **real wall-clock: 0.143 → 0.782 s = +445%** |
+| runner scan, tracemalloc ON | 0.983, 1.002 s | 4.204–4.310 s → **2.546 s (optimized)** | harness gate runs |
+| GATE alloc-peak, tracemalloc ON | 12.49, 12.61 MiB | 13.13–14.37 MiB (n=4) → **13.97 MiB (optimized)** | mean 13.68 vs baseline mean 12.01 = **+13.9%** (optimized reading +16.3% — within the 20% gate) |
+| runner scan, tracemalloc OFF | 0.151, 0.137, 0.142 s (mean 0.143) | 0.787, 0.778, 0.783, 0.779 s (mean 0.782) → **0.435–0.516 s (mean 0.476, n=6, optimized)** | **real wall-clock: 0.143 → 0.782 s = +445% → 0.476 s = +233%; Phase-5-close optimization cut the classification pass ~half (−41% wall from 0.782, KB pass 8.5 → 4.7 µs/file)** |
 | pre-perf Phase 5 (`1a85a8c`), tracemalloc ON | — | 8.656, 8.667 s | alloc 15.05, 15.73 MiB → **crossed the >20% gate** vs 4′ (up to +35%) and drove `96cdb16` (reactive perf fix, like Phase 3's 2.109→1.054) |
+
+Optimization applied at Phase-5 close ("Block Phase 6 until optimized") before Exports v2
+(started at the corrected evidence set): (1) **folder-context scan classification** —
+`kb.prepare_scan_folder` resolves the folder-transitive prefix tiers (0/1/5) once per
+folder; `classify_scan_path` reuses that context per file with exact per-file equality
+(`tests/test_kb_scan_parity.py`); (2) **name-only fast paths** — when a folder carries no
+Tier-2/Tier-4 marker the per-file component scan collapses to the filename
+(`classify_scan_name`); (3) **derived file key** — `file_key = ctx.folder_key + os.sep + name.lower()`,
+no normpath/normcase per file; (4) **frozen ScanAssessment memoization** by
+(category, bucket) — per-file dataclass construction (and its allocation peak) removed for
+identical verdicts; the shared instances are immutable (I10 reads fields only).
 
 Findings: (1) tracemalloc itself inflates *both* inputs ~6–7× (the Phase-4 metadata
 scan is 0.985–1.006 s instrumented but 0.137–0.151 s plain), so instrumented wall
 time is an instrumentation artifact; gate decisions use alloc-peak + retained.
-(2) The real Phase-5 cost is **+445% wall time (0.78 s absolute for 50k files,
-~13 µs/file)**: honest, large, and a Phase 8 target (candidate: folder-prefix
-classification caching, filename-only Tier-3 decisions). (3) alloc-peak noise:
+(2) The real Phase-5 cost was **+445% wall time (0.78 s absolute for 50k files,
+~13 µs/file)**; the optimization brought it to **+233% (0.476 s, ~9.5 µs/file)** — the
+50k fixture is adversarial (no viable extension/marker for a large share of files, so
+every tier exhausts); even so the residual is now dominated by the per-item
+materialization floor (one `ScanAssessment` verdict per file is required by I10 item
+authority; shared instances are reused, not eliminated). (3) alloc-peak noise:
 baseline n=5 spans 11.64–12.60 (±4%), Phase 5 n=4 spans 13.13–14.37 (±4.5%);
 no single-phase reading vs the opposite phase's best/worst exceeds +14%
 (worst-to-worst) — the +20.6% figure was a max-vs-min coincidental pairing.

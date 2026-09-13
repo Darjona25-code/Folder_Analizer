@@ -38,11 +38,27 @@ _TIER4_PATTERNS: "tuple[tuple[str, frozenset[str]], ...]" = (
 )
 
 
-def classify(path: str, *, _key: Optional[str] = None) -> Optional[KBResult]:
+def classify(path: str, *, _key: Optional[str] = None,
+             _parts: Optional[tuple] = None) -> Optional[KBResult]:
     key = _key if _key is not None else norm(path)
-    parts = components(key)
+    parts = _parts if _parts is not None else components(key)
     for category, markers in _TIER4_PATTERNS:
         if any(part in markers for part in parts):
+            return KBResult(path=key, category=category, tier=4,
+                            confidence_hint="medium", detail="tier4:component")
+    return None
+
+
+def has_folder_marker(parts) -> bool:
+    """True when any folder component is a Tier-4 marker (scan hot path)."""
+    return any(part in markers for category, markers in _TIER4_PATTERNS
+               for part in parts)
+
+
+def classify_scan_name(key: str, name: str) -> Optional[KBResult]:
+    """Tier 4 verdict for a bare basename whose folder carries no Tier-4 marker."""
+    for category, markers in _TIER4_PATTERNS:
+        if name in markers:
             return KBResult(path=key, category=category, tier=4,
                             confidence_hint="medium", detail="tier4:component")
     return None

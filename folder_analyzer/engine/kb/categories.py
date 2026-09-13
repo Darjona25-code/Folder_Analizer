@@ -113,10 +113,16 @@ _EXTENSIONS: "dict[str, str]" = {
 }
 
 
-def classify(path: str, *, _key: Optional[str] = None) -> Optional[KBResult]:
-    """Tiers 2 then 3: component patterns before extension evidence."""
+def classify(path: str, *, _key: Optional[str] = None,
+             _parts: Optional[tuple] = None) -> Optional[KBResult]:
+    """Tiers 2 then 3: component patterns before extension evidence.
+
+    ``_parts`` is the precomputed component list (folder-context scan path
+    shares the folder's parts across the files beneath it). When omitted the
+    parts are derived from ``_key``/``path`` exactly as before.
+    """
     key = _key if _key is not None else norm(path)
-    parts = components(key)
+    parts = _parts if _parts is not None else components(key)
 
     if any(part in _TIER2_MARKERS for part in parts):
         for category, markers in _TIER2_PATTERNS:
@@ -128,6 +134,32 @@ def classify(path: str, *, _key: Optional[str] = None) -> Optional[KBResult]:
     if not parts:
         return None
     ext = os.path.splitext(parts[-1])[1]
+    category = _EXTENSIONS.get(ext)
+    if category is not None:
+        return KBResult(path=key, category=category, tier=3,
+                        confidence_hint="high", detail="tier3:extension")
+    return None
+
+
+def has_folder_marker(parts) -> bool:
+    """True when any folder component is a Tier-2 marker.
+
+    Used by the scan hot path: when a folder contributes no marker, a file's
+    Tier-2 verdict depends only on its own name (``classify_scan_name``) and
+    the full component scan is unnecessary — equality is exact.
+    """
+    return any(part in _TIER2_MARKERS for part in parts)
+
+
+def classify_scan_name(key: str, name: str) -> Optional[KBResult]:
+    """Tiers 2/3 for a bare basename whose folder carries no Tier-2 marker."""
+    if name in _TIER2_MARKERS:
+        for category, markers in _TIER2_PATTERNS:
+            if name in markers:
+                return KBResult(path=key, category=category, tier=2,
+                                confidence_hint="medium",
+                                detail="tier2:component")
+    ext = os.path.splitext(name)[1]
     category = _EXTENSIONS.get(ext)
     if category is not None:
         return KBResult(path=key, category=category, tier=3,

@@ -38,6 +38,7 @@ from .engine.enums import (
     SystemImpact,
 )
 from .engine.models import FileEntry, FolderAggregation, FolderComposition, ScanResult
+from .engine.kb import prepare_scan_folder
 from .engine.recommender import derive_folder_recommendation
 from .engine.retention import (
     RetainedFileStore,
@@ -189,6 +190,7 @@ class Scanner:
         pending: List[Tuple[os.DirEntry, os.stat_result]] = []
         assessments: "Dict[str, ScanAssessment]" = {}
         tally = _FolderTally()
+        ctx = prepare_scan_folder(path)
         for entry in entries:
             try:
                 if entry.is_file(follow_symlinks=False):
@@ -205,14 +207,14 @@ class Scanner:
                     info.file_count += 1
                     try:
                         rec = classify_scan(
-                            entry.path, filename=entry.name,
+                            entry.path, filename=entry.name, _ctx=ctx,
                         )
                     except Exception:
                         # Classification must never break the scan: degrade to
                         # the NOT_RESOLVABLE pipeline (UNKNOWN/REVIEW_FIRST/LOW).
                         rec = classify_scan(
                             entry.path, filename=entry.name,
-                            not_resolvable=True,
+                            not_resolvable=True, _ctx=ctx,
                         )
                     assessments[entry.path] = rec
                     _bump(tally, st.st_size, rec)
@@ -317,6 +319,7 @@ class Scanner:
         pending: List[Tuple[os.DirEntry, os.stat_result]] = []
         assessments: "Dict[str, ScanAssessment]" = {}
         try:
+            ctx = prepare_scan_folder(folder_path)
             for entry in os.scandir(folder_path):
                 try:
                     if entry.is_file(follow_symlinks=False):
@@ -324,12 +327,12 @@ class Scanner:
                         pending.append((entry, st))
                         try:
                             assessments[entry.path] = classify_scan(
-                                entry.path, filename=entry.name,
+                                entry.path, filename=entry.name, _ctx=ctx,
                             )
                         except Exception:
                             assessments[entry.path] = classify_scan(
                                 entry.path, filename=entry.name,
-                                not_resolvable=True,
+                                not_resolvable=True, _ctx=ctx,
                             )
                 except (OSError, PermissionError):
                     continue

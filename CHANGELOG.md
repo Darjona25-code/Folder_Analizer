@@ -41,13 +41,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Assessment parity; scanner end-to-end metadata/aggregation/retention with real
   classification; I10 authority; suite grew **304 passed, 2 skipped**.
 - **Benchmark (measured, honest):** Phase 5 pinned gate runs 4.204–4.310 s
-  instrumented; gate alloc-peak **13.13–14.37 MiB** (representative delta
-  **+13.9% mean / +15.9% median** vs corrected baseline; retained_records
+  instrumented; gate alloc-peak **13.97 MiB** (representative delta
+  **+16.3%** vs corrected baseline; retained_records
   7,400 @ +0%) — within the 20% gate. **Uninstrumented direct wall-clock is the
   real cost: 0.143 s (Phase 4) → 0.782 s (Phase 5) = +445%**, flagged as a
   Phase 8 (Performance & Scale) priority. (The instrumented numbers are inflated
   ~6–7× by tracemalloc for BOTH phases.) Evidence table in
   `docs/ARCHITECTURE.md` §6a; RSS remains informational envelope.
+- **Phase-5 close optimization ("block Phase 6 until optimized"):** scan hot path
+  restructured with exact-parity guarantees (`tests/test_kb_scan_parity.py`):
+  folder-context tier pre-resolution (`kb.prepare_scan_folder` /
+  `classify_scan_path` — prefix tiers 0/1/5 resolved once per folder, component
+  tiers 2/4 plus extension 3 run per file), name-only fast paths where the folder
+  carries no marker, a derived per-file key (no normpath/normcase per file), and
+  frozen `ScanAssessment` memoization by (category, bucket). Measured uninstrumented
+  wall **0.782 → 0.476 s (mean, n=6, −39%)**; KB classification pass 8.5 → 4.7
+  µs/file; instrumented gate-scan 4.2 → 2.55 s. Suite grew **313 passed, 2
+  skipped**.
 - **Docs:** `docs/ARCHITECTURE.md` (module map → Phase 5, scanner flow, KB wiring,
   phase-5 baseline row), `docs/SAFETY.md`, `docs/ROADMAP.md` Phase 5 → COMPLETE.
 

@@ -526,14 +526,16 @@ Fixed process (re-affirmed):
 - **Risks:** threshold miscalibration = **highest-uncertainty area** (mitigated: marked provisional + configurable + corpus validation).
 - **Estimated effort:** 8–14 h. **Uncertainty:** High.
 - **Status: COMPLETE (2026-09-13).** Assessment + composition wired into the scan
-  (`engine/classifier.py`, `engine/recommender.py`); R1–R5 short-circuits with
-  named config; 8 canonical examples as tests; 100 GB case; NOT_RESOLVABLE→
-  UNKNOWN aggregation; I10 authority test (item SAFE/HIGH beneath folder
-  REVIEW_FIRST still guard-valid); benchmark gate alloc-peak 13.13–14.37 MiB
-  (+13.9% mean / +15.9% median vs corrected 4′, retained 7,400 @ +0%) within
-  the 20% gate. **Uninstrumented wall-clock is +445% (0.143 s → 0.782 s) —
-  flagged Phase 8 priority** (§15/§22; evidence `docs/ARCHITECTURE.md` §6a).
-  Suite 307 passed / 2 skipped.
+    (`engine/classifier.py`, `engine/recommender.py`); R1-R5 short-circuits with
+    named config; 8 canonical examples as tests; 100 GB case; NOT_RESOLVABLE—
+    UNKNOWN aggregation; I10 authority test (item SAFE/HIGH beneath folder
+    REVIEW_FIRST still guard-valid); benchmark gate alloc-peak 13.97 MiB (+16.3%
+    vs corrected 4′), retained 7,400, within the 20% gate. **Uninstrumented
+    wall-clock: measured 0.143 → 0.782 s (+445%) and, after the reviewer-bulleted
+    close optimization ("block Phase 6 until optimized"), 0.476 s (mean, n=6,
+    −39%; KB pass 8.5 → 4.7 µs/file); the residual is the I10 per-item floor and
+    is a Phase 8 watch item, not a Phase-6 blocker** (§15/§22/§24-7; evidence
+    `docs/ARCHITECTURE.md` §6a). Suite 313 passed / 2 skipped.
 
 ### Phase 6 — Exports v2
 - **Objective:** export schema v2 (assessment fields + `analysis_state` markers); CSV/HTML/JSON deterministic.
@@ -648,14 +650,22 @@ Fixed process (re-affirmed):
 4. **Retention/analysis limits** — engineering defaults, configurable.
 5. **PyInstaller/Qt quirks (Phase 11)** — real risk, dedicated phase.
 6. **Registry unavailability (KB T5)** — never affects correctness.
-7. **Phase-5 classification cost (+445% real wall-clock on the 50k fixture)** — the
-   recommendation/composition wiring measured **0.143 s (Phase 4) → 0.782 s (Phase 5)**
-   uninstrumented, pinned P-cores (**5.5×**), deferred to Phase 8 (Performance & Scale).
+7. **Phase-5 classification cost (+233% real wall-clock on the 50k fixture after
+   close optimization; +445% pre-optimization)** — the recommendation/composition
+   wiring measured **0.143 s (Phase 4) → 0.782 s (Phase 5)** uninstrumented, pinned
+   P-cores (**5.5×**). At the Phase-5 close ("block Phase 6 until optimized") the scan
+   hot path was restructured (folder-context tier pre-resolution, name-only fast
+   paths, derived file key, frozen ScanAssessment memoization): wall **0.782 → 0.476 s
+   (mean, n=6, −39%)**, KB classification pass 8.5 → 4.7 µs/file, instrumented
+   alloc-peak back inside the 20% gate (13.97 MiB, +16.3%). The 50k fixture is
+   adversarial (a large file share has no extension/marker, exhausting every tier);
+   the residual is the I10 per-item materialization floor. Carried forward as a
+   **watch item only, not a Phase-6 blocker** — residual window is a Phase 8 activity.
    **Decision (Phase 6/7 guardrail): Phases 6 (Exports v2) and 7 (Web UI) must NOT add
    per-file hot-path processing** — they consume the already-collected `ScanResult`
    (exports iterate over scan-phase products; web reads the same data) and must not
-   re-scan or re-classify. The regression is carried forward because real-world scan
-   sizes are far below the 50k stress fixture, and the primary optimization window
+   re-scan or re-classify. Real-world scan sizes are far below the 50k stress fixture,
+   and the primary optimization window
    (folder-prefix classification caching, filename-only Tier-3 decisions) is a Phase 8
    activity. Re-evaluate at every phase close; do not let this regress further.
 8. **Example 6 confidence value provenance (composition model)** — the committed
