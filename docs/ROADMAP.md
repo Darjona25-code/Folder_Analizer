@@ -1,6 +1,6 @@
 # Folder Analyzer — Master Roadmap v3.0
 
-Status: **APPROVED — Phases 1–4 complete (Phase 4: Knowledge Base, standalone not wired), Phase 5 next.**
+Status: **APPROVED — Phases 1–5 complete (Phase 5: recommendation engine + folder composition wired into the scan; gate metrics within tolerance), Phase 6 next.**
 Version of this document: Phase 1 baseline commit.
 
 This is the implementation contract for the project. It is the single, internally
@@ -525,6 +525,13 @@ Fixed process (re-affirmed):
 - **Acceptance criteria:** all invariant-example tests pass; thresholds configurable; reason always present; validation against broader/randomized real-folder corpus (not only the 8 canonical examples).
 - **Risks:** threshold miscalibration = **highest-uncertainty area** (mitigated: marked provisional + configurable + corpus validation).
 - **Estimated effort:** 8–14 h. **Uncertainty:** High.
+- **Status: COMPLETE (2026-09-13).** Assessment + composition wired into the scan
+  (`engine/classifier.py`, `engine/recommender.py`); R1–R5 short-circuits with
+  named config; 8 canonical examples as tests; 100 GB case; NOT_RESOLVABLE→
+  UNKNOWN aggregation; I10 authority test (item SAFE/HIGH beneath folder
+  REVIEW_FIRST still guard-valid); benchmark gate alloc-peak 13.14–14.04 MiB
+  (+4.3…+14.3% vs corrected 4′ upper bound, retained 7,400 @ +0%) within the
+  20% gate. Suite 304 passed / 2 skipped. See `docs/ARCHITECTURE.md` §6 row 5.
 
 ### Phase 6 — Exports v2
 - **Objective:** export schema v2 (assessment fields + `analysis_state` markers); CSV/HTML/JSON deterministic.

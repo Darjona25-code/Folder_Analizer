@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Phase 5 — Recommendation Engine + Folder Composition + ScanResult)
+
+- **Assessment pipeline wired into the scan** (`engine/classifier.py`): tied tiers
+  0→5 through `eval_decision`-style policies into `Assessment`/`ScanAssessment`
+  (frozen `slots` dataclasses). Items carry `detected_category`, three-axis
+  values, `reason_key` (Phase-2 keys + `user_value`/`known_non_disposable`/
+  `not_resolvable`/`protected_critical`), and a precomputed `CompositionBucket`.
+  `NOT_RESOLVABLE` stays `None` and the aggregation normalizes it to
+  `UNKNOWN`/`unknown` — the KB never fabricates assessments.
+- **Folder composition** (`engine/recommender.py`): `CompositionBucket` starts at
+  100% `UNKNOWN` and is split by real classification as the scan aggregates every
+  file's bytes; `derive_folder_recommendation` applies roadmap §11 short-circuits
+  R1–R5 with named `CompositionConfig` (0.85 / 0.10 / 0.15), R3 demotion for
+  `unknown ≥ 0.25`, the Downloads policy floor (`REVIEW_FIRST`), oversize
+  awareness (100 GB case), and empty-tree handling. Shares always sum to 100% of
+  descendant bytes. Derived recommendations reuse the Phase-2 confidence gate —
+  no SAFE without HIGH confidence.
+- **ScanResult scope (I10):** every `FileEntry` shows its assessment and every
+  `FolderAggregation` its derived assessment + composition. Item-level
+  authority is preserved: `valid-item-SAFE/HIGH` beneath a folder-derived
+  `REVIEW_FIRST` is still validated by the deletion guard (guarding only the
+  folder-as-a-whole action).
+- **Perf discipline:** scan path normalizes each path **once** (tier `classify`
+  accepts a precomputed `_key`); tier modules cached in a lazy dict; Tier-2
+  marker union fast-path; analyzer-side `ScanAssessment` keeps classification
+  cheap (`bucket` precomputed, no `reason_params` dict for static keys);
+  retention materializes full `Assessment`s only for the retained subset.
+- **Tests** (`tests/test_classifier.py`, `tests/test_file_analysis.py`,
+  `tests/test_i10_integration.py`, `tests/conftest.py`): `classification_neutral_env`
+  + `scan_sandbox` fixtures (scan tests are immune to the real `%TEMP%`);
+  8 canonical composition examples; NOT_RESOLVABLE→UNKNOWN; scan-record ⇄
+  Assessment parity; scanner end-to-end metadata/aggregation/retention with real
+  classification; I10 authority; suite grew **304 passed, 2 skipped**.
+- **Benchmark (measured, honest):** Phase 5 pinned runs 4.717–4.823 s; gate
+  alloc-peak **13.14–14.04 MiB** (+4.3…+14.3% vs corrected baseline upper
+  bound, retained_records 7,400 @ +0%) — within the 20% gate. The wall-time
+  inflation is tracemalloc tracking ~10M per-file classification allocations
+  (uninstrumented classification cost ≈ 0.7 s / +70%). Rows + artifacts in
+  `docs/ARCHITECTURE.md` §6; RSS remains informational envelope.
+- **Docs:** `docs/ARCHITECTURE.md` (module map → Phase 5, scanner flow, KB wiring,
+  phase-5 baseline row), `docs/SAFETY.md`, `docs/ROADMAP.md` Phase 5 → COMPLETE.
+
 ### Added (Phase 4 — Knowledge Base, standalone / not wired)
 
 - **Tiered knowledge base** (`folder_analyzer/engine/kb/`, roadmap §10; approved

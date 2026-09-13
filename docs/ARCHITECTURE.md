@@ -1,6 +1,7 @@
 # Folder Analyzer — Architecture
 
-Status: **Phase 4 — Knowledge Base implemented (not wired).** This document
+Status: **Phase 5 — Recommendation Engine + Folder Composition wired into the scan.**
+This document
 intentionally contains only the core/interface boundary, the current module map, the
 CLI/Web/Desktop relationship, and the benchmark table. Performance (§ Phase 8), desktop
 (§ Phase 9/10), packaging (§ Phase 11), and localization (§ Phase 7) sections will be
@@ -32,7 +33,7 @@ Interfaces:
 - **Desktop** (PySide6, Phase 9+) consumes the core **directly in-process**. There is
   **no** `Desktop → localhost FastAPI → Core` path.
 
-## 2. Current module map (Phase 4)
+## 2. Current module map (Phase 5)
 
 | Module | Responsibility | Boundary |
 |---|---|---|
@@ -44,8 +45,10 @@ Interfaces:
 | `folder_analyzer/engine/enums.py` | Three-axis value spaces: `SystemImpact` / `DeletionRecommendation` / `ConfidenceLevel` | Core — safety model |
 | `folder_analyzer/engine/models.py` | Immutable `Assessment` (phase 2, confidence gate I9/I3/I7) + `FileEntry` / `FolderAggregation` / `ScanResult` (phase 3, metadata-only) | Core — safety model + data-model boundary |
 | `folder_analyzer/engine/retention.py` | `RetentionConfig` + `RetainedFileStore`: bounded prioritized FileRecord retention (non-safe → representative → largest), lazy `FileEntry` materialization from raw `(DirEntry, stat)` pairs | Core — retention boundary |
-| `folder_analyzer/engine/explain.py` | `reason_key` → localized EN/ES text (Phase 2 keys; full i18n migration is Phase 7) | Core |
-| `folder_analyzer/engine/kb/` | Tiered knowledge base (roadmap §10): T0 critical/system paths, T1 env + Known Folders, T2 component patterns, T3 extension table, T4 app rules, T5 optional registry; `classify`/`classify_content` → `KBResult`; bounded L2/L3 content reads; per-session batch caching. **Not wired into the scan path yet** (Phase 5) | Core — KB boundary |
+| `folder_analyzer/engine/explain.py` | `reason_key` → localized EN/ES text (Phase 2 keys + Phase 5 item/folder reason keys; full i18n migration is Phase 7) | Core |
+| `folder_analyzer/engine/kb/` | Tiered knowledge base (roadmap §10): T0 critical/system paths, T1 env + Known Folders, T2 component patterns, T3 extension table, T4 app rules, T5 optional registry; `classify`/`classify_content` → `KBResult`; bounded L2/L3 content reads; per-session batch caching. Wired into the scan path since Phase 5 (single-normalize tier dispatch, cached tier modules) | Core — KB boundary |
+| `folder_analyzer/engine/classifier.py` | `classify_path`/`classify_scan`: KB result | policy | `Assessment` / lean `ScanAssessment` (bucket precomputed); successful pipeline only — `NOT_RESOLVABLE` returns `None` and aggregator normalizes to `UNKNOWN/a`; `fuse_folders_and_files`-style summary is compositional (see `recommender`) | Core — assessment boundary |
+| `folder_analyzer/engine/recommender.py` | `derive_folder_recommendation`: roadmap §11 short-circuit R1–R5 with named `CompositionConfig` (0.85/0.10/0.15), R3 demotion (unknown ≥ 0.25), Downloads floor `REVIEW_FIRST`, 8 canonical examples, 100 GB case | Core — composition boundary |
 | `folder_analyzer/utils.py` | Size formatting, drive default | Core |
 | `folder_analyzer/treemap.py` | Treemap layout (presentation helper) | Core |
 | `folder_analyzer/reporter.py` | Rich reporting helpers | Core |
@@ -67,7 +70,14 @@ not-wired** component: it classifies *paths* (and, on explicit request, bounded 
 prefixes) into a `KBResult(category, tier, confidence_hint, level, detail)` but nothing
 in the scanner imports it yet — the scanner hot path is byte-identical since Phase 3
 (verified: `folder_analyzer/scanner.py` unchanged between Phase 3 and Phase 4 close).
-Wiring (per-item/per-folder attribution into `Assessment`) is Phase 5.
+
+Phase 5 wires it: `classify_scan` is called per file during the scan; each record
+carries its `ScanAssessment`/bucket; per-folder aggregation buckets bytes into
+`CompositionBucket` and every folder gets a derived `Assessment` (roadmap §11);
+`ScanResult`/`FileEntry`/`FolderAggregation` expose full assessments and
+recommendations (I10: item-level `SAFE_TO_DELETE`+`HIGH` authority is preserved
+beneath a folder's derived `REVIEW_FIRST`; the folder recommendation gates only the
+folder-as-a-whole action).
 
 ## 3. CLI / Web / Desktop relationship
 
@@ -239,7 +249,7 @@ LP-E ~2.7 s for the 50k scan), and RSS-delta is a working-set sampling artifact 
 | 3 | 1.054 | 47,437 | 21.85 | 7,400 | 59.75 | Level-1 metadata + bounded retention (unpinned; historical) |
 | 4 | 1.001–1.495 | 33,455–49,973 | 20.6–29.1 | 7,400 | 58.8–78.3 | KB added but **not wired** (`scanner.py` byte-identical to Phase 3). Spread was core-scheduling noise (see corrected methodology above) |
 | **4′** | **0.985–1.006** (5 runs; ±2.1%) | ~49,700 | **11.64–12.60** | **7,400** | 31.96–34.21 | **CORRECTED Phase-4 baseline (Phase 5 harness): pinned to P-cores [`0,1`/`10,11`], gate = alloc-peak + retained.** Supersedes the noisy RSS-based rows above as the reference for all future phases. Runs: `benchmarks/results/baseline-phase5-pinned-r1..r5.json` |
-| 5 | (Phase 5 result — appended on close) | | | | | Recommendation engine + folder composition wired (expected real classification cost) |
+| **5** | **4.717–4.823** (3 runs) | ~10,200–10,600 | **13.14–14.04** | **7,400** | 36.41–38.28 | **Phase 5: recommendation engine (Assessment) + folder composition wired into the scan path**, plus classifier + KB module caching and path-normalize hoisting. Gate deltas vs 4′: alloc-peak **+4.3%…+14.3%** (vs upper bound) / +15.5%…+20.6% (vs lower bound), retained **0%**. Wall time is dominated by tracemalloc tracking of per-file classification allocations (~10M allocs/run); the uninstrumented classification cost is ≈0.7 s (+70%), so wall time is reported but the gate is alloc-peak + retained. Runs: `benchmarks/results/phase5-pinned-r{1..3}.json`, latest `phase5-pinned.json` |
 | … | | | | | | |
 
 > **RSS trend watch (Phase 5 close):** the historical Phase-1–4 rows used RSS-delta,
@@ -247,9 +257,10 @@ LP-E ~2.7 s for the 50k scan), and RSS-delta is a working-set sampling artifact 
 > larger than the 20% gate). The corrected methodology measures the two
 > deterministic gate metrics (alloc-peak, retained) going forward; the Phase-4
 > corrected baseline is **alloc 11.64–12.60 MiB, retained 7,400**, envelope RSS
-> 31.96–34.21 MiB. The KB tables (~tens of KB, <100 KB total) and session caches
-> are loaded in the scan process from Phase 5 (classifier wiring); their footprint
-> is captured in the Phase-5 alloc-peak rows.
+> 31.96–34.21 MiB. The KB tables (~tens of KB, <100 KB total), session caches and
+> the per-file classification records are loaded/alive in the scan process from
+> Phase 5 (classifier wiring); their footprint is captured in the Phase-5 alloc-peak
+> rows.
 
 Regression policy: a `>20%` regression vs the corrected baseline **on the gate metrics
 (alloc-peak, retained_records)** is a **phase-closing gate** (stop → investigate →

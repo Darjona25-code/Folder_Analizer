@@ -174,3 +174,47 @@ folder-analyzer --path C:\
 - **Next:** Phase 5 — Recommendation Engine + Folder Composition + ScanResult (wire the
   KB into per-item/per-folder Assessment; I1–I3/I9 positive evidence; composition
   short-circuits R1–R6). Watch RSS headroom (~1.8pp to the 20% gate).
+
+## Phase 5 — Recommendation Engine + Folder Composition + ScanResult (COMPLETED)
+
+- **Delivered** (approved scope, commits `ee44266` / `1a85a8c` / `96cdb16`):
+  - `engine/classifier.py` — `classify_path`/`classify_scan`: KB result → policy →
+    `Assessment` / lean frozen `ScanAssessment` (bucket precomputed). Successful
+    pipeline only; `NOT_RESOLVABLE` returns `None` and aggregator normalizes to
+    `UNKNOWN`/`unknown`. `assessment_from_scan_record` materializes a full
+    `Assessment` from a record (parity-tested).
+  - `engine/recommender.py` — `CompositionBucket` (starts 100% UNKNOWN, split by
+    real classification) + `derive_folder_recommendation`: roadmap §11 short-circuit
+    R1–R5, named `CompositionConfig` (0.85 / 0.10 / 0.15 / unknown-block 0.0),
+    R3 demotion (`unknown ≥ 0.25`), Downloads policy floor (REVIEW_FIRST), oversize
+    100 GB case, empty-tree handling. Shares always sum to 100% of descendant bytes.
+  - Scan wiring — `scanner.py` calls `classify_scan` per file and tags every record;
+    `retention.py` materializes full Assessments only for the retained subset;
+    `scanner._bump` reads precomputed scan-record fields; `ScanResult`/
+    `FileEntry`/`FolderAggregation` expose live assessments + folder composition.
+  - I10 authority (integration test `tests/test_i10_integration.py`): a guard-valid
+    `SAFE_TO_DELETE`+`HIGH` item beneath a folder-derived `REVIEW_FIRST` remains
+    deletable; folder review gates only the folder-as-a-whole action.
+  - Perf discipline (`96cdb16`): scan path normalizes each path **once** (tier
+    `classify` accepts precomputed `_key`); lazy `_TIER_MODULES` dict; Tier-2 marker
+    union fast-path; `slots=True` on `Assessment`/`ScanAssessment`; item-level
+    `reason_params` dropped (static reason keys; category lives in
+    `detected_category`).
+  - Tests: `tests/conftest.py` `classification_neutral_env` + `scan_sandbox`
+    fixtures (scan tests immune to the real `%TEMP%`); 8 canonical examples;
+    NOT_RESOLVABLE→UNKNOWN; scan-record ⇄ Assessment parity;
+    scanner end-to-end metadata/aggregation/retention with real classification.
+- **Suite:** **304 passed, 2 skipped.**
+- **Benchmark (Phase 5 harness, pinned):** 3 runs 4.717–4.823 s; gate alloc-peak
+  **13.14–14.04 MiB** (+4.3…+14.3% vs corrected 4′ upper bound; +15.5…+20.6% vs
+  lower bound), retained_records **7,400 @ +0%** — within the 20% phase-closing gate.
+  Wall time is inflated by tracemalloc tracking ~10M per-file classification
+  allocations; uninstrumented classification cost ≈ 0.7 s (+70%). RSS envelope
+  36.41–38.28 MiB (informational). Rows + artifacts in `docs/ARCHITECTURE.md` §6
+  (`phase5-pinned-r1..r3.json`, latest `phase5-pinned.json`); note
+  `benchmarks/results/` is gitignored (local reference only).
+- **Docs:** `docs/ARCHITECTURE.md` (module map → Phase 5, KB wiring §2, phase-5
+  baseline row §6), `docs/SAFETY.md` (I3/I10 → implemented, retention activation,
+  §10/§11), `docs/ROADMAP.md` (Phase 5 → COMPLETE, status header), `CHANGELOG.md`.
+- **Next:** Phase 6 — Exports v2 (export schema v2 with assessment fields +
+  `analysis_state` markers; deterministic CSV/HTML/JSON).

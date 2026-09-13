@@ -1,15 +1,21 @@
 # Folder Analyzer — Safety Model & Deletion Security
 
-Status: **Phase 4 — Knowledge Base implemented (standalone, not wired).**
+Status: **Phase 5 — Recommendation Engine + Folder Composition wired into the scan.**
 The three-axis safety model (enums, `Assessment`, construction-time confidence
 gate, explainability) is implemented in Phase 2 and documented in §6. Phase 3
 adds per-file metadata + bounded retention (Level-1 analysis only). Phase 4
 adds the Knowledge Base (`folder_analyzer/engine/kb/`): tiered **path**
 classification plus **bounded Level 2/3 content** detection, exposed as
-`KBResult` objects. The KB is **not integrated into any scan/delete path**:
-it produces categories only, never `Assessment` objects, and nothing in
-`scanner.py` imports it. Folder-level composition and the live recommendation
-engine are **Phase 5 (composition)** work.
+`KBResult` objects. Phase 5 wires it in: every scanned file is classified
+through the KB and carried into an `Assessment`/`ScanAssessment`, per-folder
+`CompositionBucket`s (byte shares sum to 100% of descendant bytes) drive
+`derive_folder_recommendation` (roadmap §11 short-circuits), and
+`ScanResult`/`FileEntry`/`FolderAggregation` expose live assessments and
+recommendations. Item-level authority is preserved (I10): a validated
+`SAFE_TO_DELETE`+`HIGH` item beneath a folder-derived `REVIEW_FIRST` remains
+deletable — the folder recommendation gates only the folder-as-a-whole action.
+The KB never fabricates `Assessment`s (failed/content analysis stays
+`NOT_RESOLVABLE` and aggregates to `UNKNOWN`).
 
 ---
 
@@ -177,13 +183,12 @@ full single-source i18n migration is Phase 7.
   (analysis/composition time stays 0.0 in the benchmark).
 - **Bounded retention** (`engine/retention.py`): configurable global budget
   (default 10,000 records) and per-folder cap (default 200); priority
-  non-safe → representative → largest → path. **In Phase 3 the non-safe
-  component is a structural placeholder whose input is always identical:**
-  the scanner sets `assessment=None` on every `FileEntry`, and `_priority`
-  only evaluates `non_safe` when `assessment is not None` — so it returns `0`
-  for all records today and discriminates nothing. It is implemented and
-  tested with synthetic Assessments (so it activates automatically in Phase 5)
-  but must not be treated as validated by Phase 3 data.
+  **non-safe → representative → largest → path**. Since Phase 5 the scanner
+  attaches real `ScanAssessment`s, so the `non_safe` component discriminates
+  genuine (non-`SAFE_TO_DELETE`) priorities against the retirement budget
+  (verified end-to-end in `test_scanner_retention_discriminates_non_safe_via_real_classification`).
+  Assertions remain lightweight: per-file `ScanAssessment` (bucket precomputed),
+  with full `Assessment`s materialized only for the retained subset.
 - **Three-stage lifecycle:** ANALYZED always covers **100% of accessible files**;
   RETAINED is the bounded subset. Eviction reduces `records_retained` only —
   never `files_analyzed`. Folders whose records were evicted are re-analyzed on
@@ -239,9 +244,9 @@ deletion security):
   requires positive, high-confidence evidence; no SAFE without HIGH confidence,
   non-UNKNOWN impact, and a positive-evidence reason key. Prohibited chains in
   `docs/ROADMAP.md §6`.
-- **I3 — UNKNOWN (strict)** *(item level implemented; folder level Phase 5)* — any
-  UNKNOWN item ⇒ ≤ REVIEW_FIRST; any folder with any UNKNOWN descendant ⇒ ≤
-  REVIEW_FIRST (folder aggregation is Phase 5). `UNKNOWN_BLOCK = 0.0` (Phases 5).
+- **I3 — UNKNOWN (strict)** *(implemented)* — any UNKNOWN item ⇒ ≤ REVIEW_FIRST;
+  any folder with any UNKNOWN descendant ⇒ ≤ REVIEW_FIRST (folder aggregation
+  since Phase 5, roadmap §11 R3 + `UNKNOWN_BLOCK = 0.0`).
 - **I4 — Containment** *(implemented, Phase 1)* — deletion only inside the active
   scanned root.
 - **I5 — Root/ancestor protection** *(implemented, Phase 1)*.
@@ -253,34 +258,40 @@ deletion security):
   full UI/exports tooltips are Phase 7.
 - **I9 — Confidence gate** *(implemented)* — SAFE_TO_DELETE requires HIGH confidence;
   enforced at Assessment construction, not post-hoc.
-- **I10 — Item-level authority** *(scaffold implemented; full test in Phase 5)* —
-  item authority = the item's own immutable `Assessment`; folder recommendation
-  gates only folder-as-a-whole actions (see `test_i10_*` in the Phase 2 suite).
+- **I10 — Item-level authority** *(implemented, Phase 5 integration test)* —
+  item authority = the item's own immutable `Assessment`; a `SAFE_TO_DELETE`+`HIGH`
+  item beneath a folder-derived `REVIEW_FIRST` remains guard-validated; the folder
+  recommendation gates only folder-as-a-whole actions (see `tests/test_i10_integration.py`
+  and the Phase 2 `test_i10_*` suite).
 
 ## 10. Safety limitations
 
-1. The Phase 1 guard proves containment and protected-path compliance; it does **not**
-   yet classify content (the assessment engine is Phase 5).
+1. The Phase 1 guard proves containment and protected-path compliance; scan-time
+   assessment (Phase 5) is advisory — the guard itself never blocks on
+   classification, it enforces path security.
 2. Race-condition atomicity is bounded (§7); delete-by-handle hardening is future work.
 3. Long-path handling depends on the runtime and OS long-path support; real edge cases
    are validated with the path-representation tests.
 4. Symlink/junction tests degrade gracefully where OS privileges prevent reparse-point
    creation.
-5. The Phase 2 three-axis `Assessment` is a pure value model: nothing in the CLI, API,
-   or web consumes it yet. Pipeline integration (scan-time assessments, folder
-   aggregation, delete UI gating) is Phase 5+.
-6. Phase 3/4 file analysis is **metadata only (Level 1)** at scan time. The KB
-   package (Phase 4) *can* classify paths and bounded content prefixes, but it is
-   not wired into scans, so per-`FileEntry` records still carry no classification,
-   no signatures, and the scanner performs no content reads. The default `unknown`
-   category and zeroed `by_*` aggregations must never be read as safety signals.
-   Confirmed: **the KB produces `KBResult` categories only — it never constructs
+5. The Phase 2 three-axis `Assessment` is fully wired since Phase 5 (scan-time
+   assessments, folder aggregation, composition). Stil progress: only the UI-side
+   delete gating that *renders* the assessment is not consumed by the CLI/API yet
+   (surfacing polish is Phase 7/12 work).
+6. Phase 3/4 file analysis is **metadata only (Level 1)** at scan time; the KB
+   package *can* classify bounded content prefixes but the scanner never reads file
+   contents (analysis/composition time stays 0.0 in the benchmark). Since Phase 5
+   every accessible file is path-classified into its `ScanAssessment`; a failed or
+   unfounded classification stays `NOT_RESOLVABLE` and aggregates to `UNKNOWN` —
+   the default/unknown outcome must never be read as a safety signal. Confirmed:
+   **the KB produces `KBResult` categories only — it never constructs
    `Assessment` objects or `SAFE_TO_DELETE`-style recommendations** (KBResult has
    no assessment/recommendation fields; asserted by tests).
 
-## 11. What Phase 5 will add
+## 11. What Phase 5 added (implemented)
 
-- The full safety engine: classifier + recommendation engine evaluated at scan time.
+- The full safety engine now evaluates at scan time: `classify_scan` per file
+  (KB → policy → `ScanAssessment`) and `derive_folder_recommendation` per folder.
 - Folder composition and folder-level aggregation: any folder with an UNKNOWN
   descendant is at most REVIEW_FIRST (I3 folder level); a folder's derived
   recommendation never overrides item-level authority (I10 full).
@@ -288,7 +299,7 @@ deletion security):
   rich reason provenance.
 - Composition thresholds (`SAFE_MIN_SHARE` 0.85 / `KNOWN_NON_DISPOSABLE_CEILING`
   0.10 / `REVIEW_SHARE` 0.15 / `UNKNOWN_BLOCK` 0.0, per `docs/ROADMAP.md §5`) as
-  named constants.
+  named constants in `CompositionConfig`.
 
 Scan-time `NOT_RESOLVABLE` surfacing (confidence flagging, "cannot be validated"
 status in scan output) is deliberately **NOT implemented in Phases 1–3**: Phase 3
