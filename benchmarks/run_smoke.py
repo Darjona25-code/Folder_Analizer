@@ -153,6 +153,7 @@ def run_smoke(
     max_workers: int = 16,
     pinned: bool = True,
     pinned_cores: int = 2,
+    trace_alloc: bool = True,
 ) -> dict:
     affinity_mask = 0
     if pinned:
@@ -175,15 +176,19 @@ def run_smoke(
     peak_rss = {"value": rss_before}
     watcher = threading.Thread(target=_watch, daemon=True)
 
-    tracemalloc.start()
+    if trace_alloc:
+        tracemalloc.start()
     start = time.perf_counter()
     watcher.start()
     root = scanner.scan(path)
     elapsed = time.perf_counter() - start
     done["flag"] = True
     watcher.join(timeout=1.0)
-    _, mem_peak = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
+    if trace_alloc:
+        _, mem_peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+    else:
+        mem_peak = None
 
     files = scanner.scanned_files
     folders = scanner.scanned_folders
@@ -211,11 +216,11 @@ def run_smoke(
         "folder_count": folders,
         "total_size_bytes": root.total_size,
         "peak_memory_mib": round(max(peak_rss["value"] - rss_before, 0.0), 2),
-        "python_alloc_peak_mib": round(mem_peak / (1024 * 1024), 2),
+        "python_alloc_peak_mib": round(mem_peak / (1024 * 1024), 2) if mem_peak is not None else None,
         "retained_records": scanner.records_retained,
         "gate": {
             "metric_rss_envelope_mib": round(max(peak_rss["value"] - rss_before, 0.0), 2),
-            "metric_alloc_peak_mib": round(mem_peak / (1024 * 1024), 2),
+            "metric_alloc_peak_mib": round(mem_peak / (1024 * 1024), 2) if mem_peak is not None else None,
             "metric_retained_records": scanner.records_retained,
             "note": (
                 "regression gate metrics = python_alloc_peak_mib + "
@@ -235,6 +240,10 @@ def main() -> None:
                         help="Disable P-core affinity pinning (non-comparable runs)")
     parser.add_argument("--pinned-cores", type=int, default=2,
                         help="Number of fastest (P) cores to pin to")
+    parser.add_argument("--no-tracemalloc", action="store_true",
+                        help="Disable allocation tracing: plain wall-clock timing "
+                             "(no python_alloc_peak metric) — use for uninstrumented "
+                             "cost measurement")
     args = parser.parse_args()
 
     result = run_smoke(
@@ -242,6 +251,7 @@ def main() -> None:
         max_workers=args.workers,
         pinned=not args.no_pin,
         pinned_cores=args.pinned_cores,
+        trace_alloc=not args.no_tracemalloc,
     )
 
     header = (
