@@ -24,6 +24,7 @@ from folder_analyzer.engine.models import Assessment, FileEntry
 from folder_analyzer.engine.recommender import (
     compose,
     derive_folder_recommendation,
+    CompositionConfig,
 )
 
 _SYSTEM_ROOT = os.environ.get("SystemRoot", "C:\\Windows")
@@ -254,6 +255,64 @@ def test_canonical_ex4_matches_user_corrected_expectation():
     assert folder.impact is SystemImpact.LOW
     assert folder.confidence is ConfidenceLevel.MEDIUM
     assert folder.reason_key == "r3_unknown"
+
+
+def test_folder_confidence_gate_demotes_r5_eligible_safe_to_review():
+    """Isolated I9 at FOLDER level (reviewer REQUIRED this directly).
+
+    Build a composition that satisfies R5's share gates exactly (disposable
+    0.90, known_non_disposable 0.10, zero UNKNOWN bytes — so R1/R2/R3/R4
+    cannot fire: PROTECTED_CRITICAL=0, USER_VALUE=0, UNKNOWN=0, known_share
+    0.10 < REVIEW_SHARE 0.15). At the default gate this is SAFE_TO_DELETE/HIGH.
+    When the folder's classification evidence is genuinely credible only to
+    MEDIUM or LOW confidence (gate lowered), the construction-time confidence
+    gate I9 must demote the folder to REVIEW_FIRST — proving the folder-level
+    gate fires and that no SAFE rationale survives the demotion.
+    """
+    entries = [
+        _classified("C:\\fake\\cache\\cache_a.bin", 900),
+        _classified("C:\\fake\\config\\settings.json", 100),
+    ]
+    comp = compose(entries)
+    assert comp.share(CompositionBucket.DISPOSABLE) == pytest.approx(0.9)
+    assert comp.share(CompositionBucket.KNOWN_NON_DISPOSABLE) == pytest.approx(0.1)
+    assert comp.protected_critical_bytes == 0
+    assert comp.user_value_bytes == 0
+    assert comp.unknown_bytes == 0  # R3 is NOT the gating rule here
+
+    default = derive_folder_recommendation(None, comp)
+    assert default.recommendation is DeletionRecommendation.SAFE_TO_DELETE
+    assert default.confidence is ConfidenceLevel.HIGH
+    assert default.reason_key == "r5_safe_to_delete"
+
+    for gate in (ConfidenceLevel.MEDIUM, ConfidenceLevel.LOW):
+        folder = derive_folder_recommendation(
+            None, comp, config=CompositionConfig(confidence_gate=gate))
+        assert folder.recommendation is DeletionRecommendation.REVIEW_FIRST
+        assert folder.confidence is gate
+        assert folder.reason_key == "confidence_gate_promoted"
+
+
+def test_folder_safe_never_carries_below_high_confidence_under_default_gate():
+    """Exhaustive I9 well-formedness across the R5-eligible share band.
+
+    Under the default configuration the pipeline can never emit a SAFE folder
+    with confidence below HIGH; genuinely uncertain evidence is expressed only
+    through the share ladder (UNKNOWN -> R3, KNOWN_NON_DISPOSABLE -> R4/R6),
+    so an ``Assessment`` constructed by ``derive_folder_recommendation`` always
+    satisfies I9 at the source.
+    """
+    config = CompositionConfig()
+    for known_share in (0.0, 0.05, 0.10):
+        entries = [
+            _classified("C:\\fake\\cache\\cache_a.bin",
+                        int((1 - known_share) * 1000)),
+            _classified("C:\\fake\\config\\settings.json",
+                        int(known_share * 1000)),
+        ]
+        folder = derive_folder_recommendation(None, compose(entries), config=config)
+        if folder.recommendation is DeletionRecommendation.SAFE_TO_DELETE:
+            assert folder.confidence is ConfidenceLevel.HIGH
 
 
 def test_canonical_folder_assessments_resolve_in_both_locales():

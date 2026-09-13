@@ -258,6 +258,33 @@ def test_scanner_retention_discriminates_non_safe_via_real_classification(scan_s
         _shutil_rmtree(tmpdir)
 
 
+def test_retention_prefers_non_safe_over_safe_of_equal_size(scan_sandbox):
+    """Phase 5, real classification, size-confounded 0: two files of IDENTICAL
+    size — a SAFE `.tmp` cache blob vs a REVIEW `.pdf` document. Size cannot
+    break the tie, so only retention priority 1 (non-safe records first)
+    decides; the REVIEW document must survive and the SAFE cache blob must be
+    evicted under a 1-record budget."""
+    tmpdir = os.path.join(scan_sandbox, "equal_size")
+    os.makedirs(tmpdir)
+    try:
+        path_safe = os.path.join(tmpdir, "scratch.tmp")
+        path_keep = os.path.join(tmpdir, "notes.pdf")
+        with open(path_safe, "w") as f:
+            f.write("x" * 500)
+        with open(path_keep, "w") as f:
+            f.write("y" * 500)
+        scanner = Scanner(max_workers=1, retention=RetentionConfig(
+            global_budget=1, per_folder_cap=5))
+        scanner.scan(tmpdir)
+        retained = scanner.records_for(tmpdir)
+        assert {r.path for r in retained} == {path_keep}
+        assert retained[0].size == 500  # identical, so decision was priority, not size
+        assert retained[0].assessment is not None
+        assert retained[0].assessment.recommendation is DeletionRecommendation.REVIEW_FIRST
+    finally:
+        _shutil_rmtree(tmpdir)
+
+
 def test_representative_sample_kept_even_if_smallest():
     """One representative per (folder, category) beats raw size."""
     store = RetainedFileStore(RetentionConfig(global_budget=1, per_folder_cap=3))
