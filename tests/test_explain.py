@@ -23,6 +23,7 @@ KNOWN_KEYS = [
     # Phase 5 folder-level composition reasons (recommender.py).
     "r1_protected_critical",
     "r2_user_value",
+    "downloads_policy",
     "r3_unknown",
     "r4_known_non_disposable_share",
     "r5_safe_to_delete",

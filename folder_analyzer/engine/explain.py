@@ -63,6 +63,11 @@ REASONS: Dict[str, Dict[str, str]] = {
         "r2_user_value": (
             "User-value descendant bytes present: manual review required."
         ),
+        "downloads_policy": (
+            "Known user Downloads location: folder-level deletion requires "
+            "review (per-file assessments may vary; item authority I10 "
+            "applies)."
+        ),
         "r3_unknown": (
             "UNKNOWN descendant bytes present ({unknown_share:.1%}): any "
             "UNKNOWN blocks safe deletion (UNKNOWN_BLOCK = 0.0)."
@@ -135,6 +140,11 @@ REASONS: Dict[str, Dict[str, str]] = {
         "r2_user_value": (
             "Hay bytes descendientes de valor para el usuario: se requiere "
             "revision manual."
+        ),
+        "downloads_policy": (
+            "Ubicacion conocida de descargas del usuario: la eliminacion a "
+            "nivel de carpeta requiere revision (las evaluaciones por archivo "
+            "pueden variar; se aplica la autoridad por elemento I10)."
         ),
         "r3_unknown": (
             "Hay bytes descendientes desconocidos ({unknown_share:.1%}): "
