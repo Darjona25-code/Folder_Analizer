@@ -40,12 +40,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   8 canonical composition examples; NOT_RESOLVABLE→UNKNOWN; scan-record ⇄
   Assessment parity; scanner end-to-end metadata/aggregation/retention with real
   classification; I10 authority; suite grew **304 passed, 2 skipped**.
-- **Benchmark (measured, honest):** Phase 5 pinned runs 4.717–4.823 s; gate
-  alloc-peak **13.14–14.04 MiB** (+4.3…+14.3% vs corrected baseline upper
-  bound, retained_records 7,400 @ +0%) — within the 20% gate. The wall-time
-  inflation is tracemalloc tracking ~10M per-file classification allocations
-  (uninstrumented classification cost ≈ 0.7 s / +70%). Rows + artifacts in
-  `docs/ARCHITECTURE.md` §6; RSS remains informational envelope.
+- **Benchmark (measured, honest):** Phase 5 pinned gate runs 4.204–4.310 s
+  instrumented; gate alloc-peak **13.13–14.37 MiB** (representative delta
+  **+13.9% mean / +15.9% median** vs corrected baseline; retained_records
+  7,400 @ +0%) — within the 20% gate. **Uninstrumented direct wall-clock is the
+  real cost: 0.143 s (Phase 4) → 0.782 s (Phase 5) = +445%**, flagged as a
+  Phase 8 (Performance & Scale) priority. (The instrumented numbers are inflated
+  ~6–7× by tracemalloc for BOTH phases.) Evidence table in
+  `docs/ARCHITECTURE.md` §6a; RSS remains informational envelope.
 - **Docs:** `docs/ARCHITECTURE.md` (module map → Phase 5, scanner flow, KB wiring,
   phase-5 baseline row), `docs/SAFETY.md`, `docs/ROADMAP.md` Phase 5 → COMPLETE.
 

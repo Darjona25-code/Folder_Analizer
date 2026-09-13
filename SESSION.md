@@ -205,14 +205,17 @@ folder-analyzer --path C:\
     NOT_RESOLVABLE→UNKNOWN; scan-record ⇄ Assessment parity;
     scanner end-to-end metadata/aggregation/retention with real classification.
 - **Suite:** **304 passed, 2 skipped.**
-- **Benchmark (Phase 5 harness, pinned):** 3 runs 4.717–4.823 s; gate alloc-peak
-  **13.14–14.04 MiB** (+4.3…+14.3% vs corrected 4′ upper bound; +15.5…+20.6% vs
-  lower bound), retained_records **7,400 @ +0%** — within the 20% phase-closing gate.
-  Wall time is inflated by tracemalloc tracking ~10M per-file classification
-  allocations; uninstrumented classification cost ≈ 0.7 s (+70%). RSS envelope
-  36.41–38.28 MiB (informational). Rows + artifacts in `docs/ARCHITECTURE.md` §6
-  (`phase5-pinned-r1..r3.json`, latest `phase5-pinned.json`); note
-  `benchmarks/results/` is gitignored (local reference only).
+- **Benchmark (measured, honest; evidence table in `docs/ARCHITECTURE.md` §6a):**
+  gate alloc-peak **13.13–14.37 MiB** vs corrected 4′ (mean 12.01) = **+13.9%
+  mean / +15.9% median** (worst-to-worst +14.0%), retained 7,400 @ +0% —
+  within the 20% gate. **Uninstrumented direct wall-clock: Phase 4 0.143 s →
+  Phase 5 0.782 s = +445% REAL classification/composition cost** (tracemalloc
+  inflates BOTH phases ~6–7×, so instrumented 4.2–4.3 s is not the real number).
+  The +445% is flagged as a Phase 8 (Performance & Scale) priority. The perf
+  commit `96cdb16` was a **reactive fix**: the pre-fix state (`1a85a8c`)
+  re-measured 8.66 s / 15.05–15.73 MiB alloc (+25–35% over the gate) → fixed to
+  4.2–4.3 s / 13.1–14.4 MiB, mirroring Phase 3's transparent 2.109→1.054 report.
+  RSS envelope 36.43–38.88 MiB (informational).
 - **Docs:** `docs/ARCHITECTURE.md` (module map → Phase 5, KB wiring §2, phase-5
   baseline row §6), `docs/SAFETY.md` (I3/I10 → implemented, retention activation,
   §10/§11), `docs/ROADMAP.md` (Phase 5 → COMPLETE, status header), `CHANGELOG.md`.

@@ -529,9 +529,11 @@ Fixed process (re-affirmed):
   (`engine/classifier.py`, `engine/recommender.py`); R1–R5 short-circuits with
   named config; 8 canonical examples as tests; 100 GB case; NOT_RESOLVABLE→
   UNKNOWN aggregation; I10 authority test (item SAFE/HIGH beneath folder
-  REVIEW_FIRST still guard-valid); benchmark gate alloc-peak 13.14–14.04 MiB
-  (+4.3…+14.3% vs corrected 4′ upper bound, retained 7,400 @ +0%) within the
-  20% gate. Suite 304 passed / 2 skipped. See `docs/ARCHITECTURE.md` §6 row 5.
+  REVIEW_FIRST still guard-valid); benchmark gate alloc-peak 13.13–14.37 MiB
+  (+13.9% mean / +15.9% median vs corrected 4′, retained 7,400 @ +0%) within
+  the 20% gate. **Uninstrumented wall-clock is +445% (0.143 s → 0.782 s) —
+  flagged Phase 8 priority** (§15/§22; evidence `docs/ARCHITECTURE.md` §6a).
+  Suite 307 passed / 2 skipped.
 
 ### Phase 6 — Exports v2
 - **Objective:** export schema v2 (assessment fields + `analysis_state` markers); CSV/HTML/JSON deterministic.

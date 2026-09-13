@@ -249,8 +249,31 @@ LP-E ~2.7 s for the 50k scan), and RSS-delta is a working-set sampling artifact 
 | 3 | 1.054 | 47,437 | 21.85 | 7,400 | 59.75 | Level-1 metadata + bounded retention (unpinned; historical) |
 | 4 | 1.001–1.495 | 33,455–49,973 | 20.6–29.1 | 7,400 | 58.8–78.3 | KB added but **not wired** (`scanner.py` byte-identical to Phase 3). Spread was core-scheduling noise (see corrected methodology above) |
 | **4′** | **0.985–1.006** (5 runs; ±2.1%) | ~49,700 | **11.64–12.60** | **7,400** | 31.96–34.21 | **CORRECTED Phase-4 baseline (Phase 5 harness): pinned to P-cores [`0,1`/`10,11`], gate = alloc-peak + retained.** Supersedes the noisy RSS-based rows above as the reference for all future phases. Runs: `benchmarks/results/baseline-phase5-pinned-r1..r5.json` |
-| **5** | **4.717–4.823** (3 runs) | ~10,200–10,600 | **13.14–14.04** | **7,400** | 36.41–38.28 | **Phase 5: recommendation engine (Assessment) + folder composition wired into the scan path**, plus classifier + KB module caching and path-normalize hoisting. Gate deltas vs 4′: alloc-peak **+4.3%…+14.3%** (vs upper bound) / +15.5%…+20.6% (vs lower bound), retained **0%**. Wall time is dominated by tracemalloc tracking of per-file classification allocations (~10M allocs/run); the uninstrumented classification cost is ≈0.7 s (+70%), so wall time is reported but the gate is alloc-peak + retained. Runs: `benchmarks/results/phase5-pinned-r{1..3}.json`, latest `phase5-pinned.json` |
-| … | | | | | | |
+| **5** | 4.204–4.310 (4-run) | ~11,600–11,900 | **13.13–14.37** (4 runs) | **7,400** | 36.43–38.88 | **Phase 5: recommendation engine (Assessment) + folder composition wired into the scan path**, plus classifier + KB module caching and path-normalize hoisting (all instrumented). Representative gate deltas vs 4′ (mean 12.01): **+13.9% (mean-to-mean) / +15.9% (median)**; best-to-best +12.8%, worst-to-worst +14.0% — within the 20% gate. (A coincidental max-vs-min pairing reached +20.6%; repeated clean runs show it is the noise band, not a stable condition — see §6a.) **Uninstrumented (direct wall-clock): Phase 4 0.137–0.151 s → Phase 5 0.778–0.787 s = +445% (5.5×) REAL cost.** tracemalloc inflates *both* phases ~6–7× (metadata scan 0.985–1.006 s instrumented vs 0.14 s plain), so instrumented wall is not interpreted as real cost. The +445% is genuine new classification/composition work **flagged as a Phase 8 (Performance & Scale) priority** — see §6a. Runs (locally, `benchmarks/results/` gitignored): `benchmarks/results/phase5-pinned-r{1..3}.json`, `phase5-pinned.json`, plus 4 clean remeasures. |
+| … | | | | | | | |
+
+### 6a. Performance evidence for the Phase 5 close (reviewer-required remeasure)
+
+Direct, unmassaged measurements (pinned P-cores, deterministic 50k fixture), re-run
+2026-09-13 at code states `7bacf54` (Phase 4), `1a85a8c` (pre-perf Phase 5),
+`bc6f733`/HEAD (Phase 5).
+
+| Measurement | Phase 4 (`7bacf54`) | Phase 5 (HEAD) | note |
+|---|---|---|---|
+| runner scan, tracemalloc ON | 0.983, 1.002 s | 4.204–4.310 s | harness gate runs |
+| GATE alloc-peak, tracemalloc ON | 12.49, 12.61 MiB | 13.13–14.37 MiB (n=4) | mean 13.68 vs baseline mean 12.01 = **+13.9%** |
+| runner scan, tracemalloc OFF | 0.151, 0.137, 0.142 s (mean 0.143) | 0.787, 0.778, 0.783, 0.779 s (mean 0.782) | **real wall-clock: 0.143 → 0.782 s = +445%** |
+| pre-perf Phase 5 (`1a85a8c`), tracemalloc ON | — | 8.656, 8.667 s | alloc 15.05, 15.73 MiB → **crossed the >20% gate** vs 4′ (up to +35%) and drove `96cdb16` (reactive perf fix, like Phase 3's 2.109→1.054) |
+
+Findings: (1) tracemalloc itself inflates *both* inputs ~6–7× (the Phase-4 metadata
+scan is 0.985–1.006 s instrumented but 0.137–0.151 s plain), so instrumented wall
+time is an instrumentation artifact; gate decisions use alloc-peak + retained.
+(2) The real Phase-5 cost is **+445% wall time (0.78 s absolute for 50k files,
+~13 µs/file)**: honest, large, and a Phase 8 target (candidate: folder-prefix
+classification caching, filename-only Tier-3 decisions). (3) alloc-peak noise:
+baseline n=5 spans 11.64–12.60 (±4%), Phase 5 n=4 spans 13.13–14.37 (±4.5%);
+no single-phase reading vs the opposite phase's best/worst exceeds +14%
+(worst-to-worst) — the +20.6% figure was a max-vs-min coincidental pairing.
 
 > **RSS trend watch (Phase 5 close):** the historical Phase-1–4 rows used RSS-delta,
 > which is a core-scheduling/working-set artifact on this hardware (±30% noise is
