@@ -60,6 +60,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   skipped**.
 - **Docs:** `docs/ARCHITECTURE.md` (module map → Phase 5, scanner flow, KB wiring,
   phase-5 baseline row), `docs/SAFETY.md`, `docs/ROADMAP.md` Phase 5 → COMPLETE.
+- **Ex6 confidence resolution (Phase-5 close):** after the approved source document
+  was supplied, the §11 canonical `Ex6 = NONE/REVIEW_FIRST/HIGH` value was confirmed
+  as a **deliberate, documented correction** of the source draft's `MEDIUM` (approved
+  2026-09-13) — routing through §24 risk item 8 with a confidence-independence-
+  axiom justification (`unknown_pct = 0` ⇒ high classification certainty; REVIEW_FIRST
+  is the R2/I7 policy floor, independent of certainty). No code or test change: the
+  R2 branch already stamps HIGH, the composition test already asserts `ConfidenceLevel.HIGH`.
+  The earlier "committed value governs" provenance framing is replaced by the
+  explicit approved-correction note; Ex6 remains `NONE/REVIEW_FIRST/HIGH`.
 
 ### Added (Phase 4 — Knowledge Base, standalone / not wired)
 

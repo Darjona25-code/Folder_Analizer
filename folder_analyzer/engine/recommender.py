@@ -27,6 +27,11 @@ The research aligns exactly with roadmap §11 canonical examples:
 | 8      | Downloads (policy)               | LOW   | REVIEW_FIRST | HIGH |
 +--------+----------------------------------+-------+--------------+------+
 
+Ex6 confidence NOTE: HIGH is a deliberate correction of the approved source draft's
+MEDIUM (approved 2026-09-13) — confidence-independence: classification certainty is
+high (`unknown_pct = 0`) and REVIEW_FIRST is the R2/I7 policy floor, independent of
+certainty; see ROADMAP §24 risk item 8.
+
 Short-circuit order R1 -> R2 -> R3 -> R4/R5/R6:
 - R1 any PROTECTED_CRITICAL bytes      -> DO_NOT_DELETE (CRITICAL iff 100%).
 - R2 any USER_VALUE bytes              -> REVIEW_FIRST (policy floor when the

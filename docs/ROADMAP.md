@@ -292,6 +292,11 @@ deletion trustworthiness over maximizing the number of SAFE_TO_DELETE results.
 | 7 | `C:\Users` | HIGH | DO_NOT_DELETE | HIGH | Protected; profiles + app data |
 | 8 | `Downloads` | LOW | REVIEW_FIRST | HIGH | Policy; per-file assessments vary |
 
+Ex6 confidence footnote: HIGH is a deliberate correction of the approved source draft's
+MEDIUM (approved 2026-09-13) — confidence-independence: classification certainty is high
+(`unknown_pct = 0`), and REVIEW_FIRST is the R2/I7 policy floor, independent of certainty.
+See §24 risk item 8 for the full justification.
+
 Examples 4: the 5% UNKNOWN drives the ceiling via R3 (`UNKNOWN_BLOCK = 0.0`). Constraint
 example (documented): 100 GB folder with 95 GB cache + 5 GB personal documents ⇒
 REVIEW_FIRST (R2), never SAFE_TO_DELETE.
@@ -668,15 +673,29 @@ Fixed process (re-affirmed):
    and the primary optimization window
    (folder-prefix classification caching, filename-only Tier-3 decisions) is a Phase 8
    activity. Re-evaluate at every phase close; do not let this regress further.
-8. **Example 6 confidence value provenance (composition model)** — the committed
-   `docs/ROADMAP.md` canonical table has carried `Ex6 = NONE/REVIEW_FIRST/HIGH`
-   (`R2; user consent required`) since the initial Phase-1 scaffold commit
-   (`5998cc42`); no committed revision ever contained MEDIUM, so no approval record of a
-   MEDIUM→HIGH change exists in this repo. If the original approved PDF specified
-   `Ex6 = REVIEW_FIRST/MEDIUM`, the discrepancy originates outside repo history (pre-repo
-   transcription). Per the §11 "internally consistent" note and the roadmap's
-   contradiction-resolution rule, the committed value governs unless a written
-   correction is approved.
+8. **Example 6 confidence value — deliberate correction from the approved source draft
+   (MEDIUM → HIGH).** The approved source document specifies `Ex6 = NONE/REVIEW_FIRST/MEDIUM`
+   (aggregation: `safe_pct = 0.20`, `protected_pct = 0`, `unknown_pct = 0`,
+   `user_data_pct = 0.50`; reason: "Contains a mixture of user documents, application
+   data, and temporary files"). The repo has carried `Ex6 = NONE/REVIEW_FIRST/HIGH`
+   (`R2; user consent required`) since the initial scaffold (`5998cc42`) and **that value
+   is retained as a deliberate design correction, approved 2026-09-13 (Phase-5 close
+   verification), not an unverified drift.** Justification, tied to the model's
+   confidence-independence axiom (ROADMAP §2: confidence measures confidence *in the
+   classification*, NOT confidence that deletion is safe — e.g. a personal document is
+   `NONE/REVIEW_FIRST/HIGH`, cf. `family_photos.zip`): the classification here is
+   high-certainty — the source's own aggregation reports `unknown_pct = 0`, so every byte
+   is confidently typed (50% documents, 30% app config/DB, 20% temp) — and the
+   REVIEW_FIRST recommendation arises purely from R2's user-value short-circuit (I7
+   floor), a deletion-safety judgment independent of classification certainty. MEDIUM
+   would assert classification uncertainty the aggregation contradicts, conflating
+   "mixed composition" with "uncertain classification" — precisely what the §2
+   confidence-semantics passage rejects. The repo is internally consistent under this
+   correction: `engine/recommender.py`'s R2 branch stamps `confidence=HIGH` for the
+   user-value case, the composition test `ex6_personal_docs_app_data` asserts
+   `ConfidenceLevel.HIGH`, and the §11 canonical table carries HIGH. This note replaces
+   the earlier "committed value governs" provenance framing; unless a written source
+   revision re-centers Ex6 as intentionally MEDIUM, HIGH stands as the approved value.
 
 ## 25. Total ETA (single authoritative figure)
 
