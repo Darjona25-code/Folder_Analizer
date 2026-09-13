@@ -20,6 +20,7 @@ from enum import Enum
 from typing import Dict, Optional, Tuple
 
 from .enums import (
+    CompositionBucket,
     ConfidenceLevel,
     DeletionRecommendation,
     SystemImpact,
@@ -168,17 +169,63 @@ class FileEntry:
 
 
 @dataclass(frozen=True)
+class FolderComposition:
+    """Exhaustive descendant-byte composition (Phase 5, roadmap §11).
+
+    The five buckets are mutually exclusive and cover every analyzed byte:
+    ``disposable + user_value + protected_critical + known_non_disposable +
+    unknown == total_bytes`` (invariant property-tested). ``total_bytes`` is the
+    sum of the sizes of the analyzed descendants in scope; zero-byte files carry
+    a bucket but contribute 0 bytes, so percentages are over ``total_bytes``.
+
+    ``by_category`` maps the raw KB category (e.g. ``cache``, ``documents``) to
+    byte totals, so folder-level impact derivation can recover category-level
+    nuance (e.g. ``documents`` vs ``downloads`` user-value impact) that a flat
+    bucket mask loses.
+
+    ``not_resolvable_count`` counts descendants flagged NOT_RESOLVABLE (Case B,
+    LOW confidence); their bytes are aggregated into the UNKNOWN bucket (R3).
+    """
+
+    total_bytes: int = 0
+    disposable_bytes: int = 0
+    user_value_bytes: int = 0
+    protected_critical_bytes: int = 0
+    known_non_disposable_bytes: int = 0
+    unknown_bytes: int = 0
+    not_resolvable_count: int = 0
+    by_category: Dict[str, int] = field(default_factory=dict)
+
+    @property
+    def buckets(self) -> Dict[CompositionBucket, int]:
+        return {
+            CompositionBucket.DISPOSABLE: self.disposable_bytes,
+            CompositionBucket.USER_VALUE: self.user_value_bytes,
+            CompositionBucket.PROTECTED_CRITICAL: self.protected_critical_bytes,
+            CompositionBucket.KNOWN_NON_DISPOSABLE: self.known_non_disposable_bytes,
+            CompositionBucket.UNKNOWN: self.unknown_bytes,
+        }
+
+    def share(self, bucket: CompositionBucket) -> float:
+        """Byte share of *bucket*, 0.0 when total_bytes is 0."""
+        if self.total_bytes <= 0:
+            return 0.0
+        return self.buckets[bucket] / self.total_bytes
+
+
+@dataclass(frozen=True)
 class FolderAggregation:
     """Per-folder aggregation over ALL analyzed files (roadmap §8/§9).
 
     ``files_analyzed`` ALWAYS equals 100% of the accessible files in the
     folder's direct scan set, regardless of how many ``records_retained`` were
-    kept after eviction. The ``by_impact`` / ``by_recommendation`` /
-    ``by_confidence`` dicts and ``app_ids`` are structurally defined now; they
-    are populated with real classifications from Phase 5 on. Phase 3 leaves
-    every record unclassified (category "unknown"), so ``unknown_count`` /
-    ``unknown_size`` reflect the unclassified default and the ``by_*`` dicts
-    are zero.
+    kept after eviction. In Phase 3 every record is unclassified; from Phase 5
+    the ``by_impact`` / ``by_recommendation`` / ``by_confidence`` dicts,
+    ``app_ids``, the protected/unknown/user_data tallies, and ``composition``
+    are populated with real classifications over the folder's direct analyzed
+    bytes. ``assessment`` carries the folder's derived recommendation
+    (roadmap §11 short-circuit composition); it never overrides item-level
+    authority (I10).
     """
 
     files_analyzed: int = 0
@@ -200,6 +247,8 @@ class FolderAggregation:
     user_data_count: int = 0
     user_data_size: int = 0
     app_ids: Dict[str, int] = field(default_factory=dict)
+    composition: Optional[FolderComposition] = None
+    assessment: Optional[Assessment] = None
 
 
 @dataclass(frozen=True)

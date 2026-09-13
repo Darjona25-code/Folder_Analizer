@@ -36,6 +36,51 @@ REASONS: Dict[str, Dict[str, str]] = {
         ),
         "keep": "No reliable disposability evidence; item is not disposable.",
         "do_not_delete": "Deletion of this item is not authorized.",
+        # --- Phase 5 item-level classification reasons (classifier.py) ---
+        "protected_critical": (
+            "Protected or system-critical path; deletion is not authorized."
+        ),
+        "disposable_positive_evidence": (
+            "Known disposable content with positive, high-confidence "
+            "evidence of disposable purpose."
+        ),
+        "user_value": (
+            "Personal/user-value content, or content the user may reasonably "
+            "want; user consent is required before deletion."
+        ),
+        "known_non_disposable": (
+            "Understood and classified, but not positively disposable."
+        ),
+        "not_resolvable": (
+            "Cannot be safely resolved in the current runtime; treated as "
+            "unknown and never deleted without review."
+        ),
+        # --- Phase 5 folder-level composition reasons (recommender.py) ---
+        "r1_protected_critical": (
+            "Protected/system-critical descendant bytes present: deletion "
+            "not authorized."
+        ),
+        "r2_user_value": (
+            "User-value descendant bytes present: manual review required."
+        ),
+        "r3_unknown": (
+            "UNKNOWN descendant bytes present ({unknown_share:.1%}): any "
+            "UNKNOWN blocks safe deletion (UNKNOWN_BLOCK = 0.0)."
+        ),
+        "r4_known_non_disposable_share": (
+            "Understood-but-not-disposable share ({known_share:.1%}) exceeds "
+            "REVIEW_SHARE ({review_share:.0%}); manual review required."
+        ),
+        "r5_safe_to_delete": (
+            "Disposable share ({disposable_share:.1%}) meets SAFE_MIN_SHARE "
+            "({safe_min_share:.0%}), known-non-disposable within ceiling "
+            "({known_non_disposable_ceiling:.0%}), positive direct disposable "
+            "evidence, high confidence."
+        ),
+        "r6_review_first": (
+            "Composition does not meet the safe-deletion criteria; manual "
+            "review required."
+        ),
     },
     "es": {
         "unknown_impact": (
@@ -61,6 +106,56 @@ REASONS: Dict[str, Dict[str, str]] = {
         ),
         "keep": "Sin evidencia fiable de descarte; el elemento no es desechable.",
         "do_not_delete": "No se autoriza la eliminacion de este elemento.",
+        # --- Phase 5 item-level classification reasons (Validador CF102) ---
+        "protected_critical": (
+            "Ruta protegida o critica para el sistema; no se autoriza la "
+            "eliminacion."
+        ),
+        "disposable_positive_evidence": (
+            "Contenido desechable conocido con evidencia positiva de alta "
+            "confianza sobre su proposito desechable."
+        ),
+        "user_value": (
+            "Contenido personal/de valor para el usuario, o que el usuario "
+            "puede querer razonablemente; se requiere consentimiento antes "
+            "de eliminar."
+        ),
+        "known_non_disposable": (
+            "Comprendido y clasificado, pero no positivamente desechable."
+        ),
+        "not_resolvable": (
+            "No se puede resolver de forma segura en el entorno actual; se "
+            "trata como desconocido y nunca se elimina sin revision."
+        ),
+        # --- Phase 5 folder-level composition reasons (recommender.py) ---
+        "r1_protected_critical": (
+            "Hay bytes descendientes protegidos/criticos para el sistema: no "
+            "se autoriza la eliminacion."
+        ),
+        "r2_user_value": (
+            "Hay bytes descendientes de valor para el usuario: se requiere "
+            "revision manual."
+        ),
+        "r3_unknown": (
+            "Hay bytes descendientes desconocidos ({unknown_share:.1%}): "
+            "cualquier UNKNOWN bloquea la eliminacion segura "
+            "(UNKNOWN_BLOCK = 0.0)."
+        ),
+        "r4_known_non_disposable_share": (
+            "La proporcion comprendida-pero-no-desechable ({known_share:.1%}) "
+            "supera REVIEW_SHARE ({review_share:.0%}); se requiere revision "
+            "manual."
+        ),
+        "r5_safe_to_delete": (
+            "La proporcion desechable ({disposable_share:.1%}) cumple "
+            "SAFE_MIN_SHARE ({safe_min_share:.0%}), lo no desechable se "
+            "mantiene dentro del tope ({known_non_disposable_ceiling:.0%}), "
+            "hay evidencia positiva directa desechable y alta confianza."
+        ),
+        "r6_review_first": (
+            "La composicion no cumple los criterios de eliminacion segura; se "
+            "requiere revision manual."
+        ),
     },
 }
 

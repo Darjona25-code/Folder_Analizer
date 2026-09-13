@@ -14,6 +14,19 @@ KNOWN_KEYS = [
     "review_before_delete",
     "keep",
     "do_not_delete",
+    # Phase 5 item-level classification reasons (classifier.py).
+    "protected_critical",
+    "disposable_positive_evidence",
+    "user_value",
+    "known_non_disposable",
+    "not_resolvable",
+    # Phase 5 folder-level composition reasons (recommender.py).
+    "r1_protected_critical",
+    "r2_user_value",
+    "r3_unknown",
+    "r4_known_non_disposable_share",
+    "r5_safe_to_delete",
+    "r6_review_first",
 ]
 
 

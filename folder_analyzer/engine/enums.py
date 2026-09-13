@@ -39,3 +39,26 @@ class ConfidenceLevel(str, Enum):
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
+
+
+class CompositionBucket(str, Enum):
+    """Exhaustive, mutually exclusive descendant-byte buckets (roadmap §11).
+
+    Every analyzed byte belongs to exactly one bucket; the five buckets sum to
+    100% of descendant bytes (Phase 5 composition invariant, property-tested).
+
+    - DISPOSABLE — known high-confidence disposable content (positive evidence).
+    - USER_VALUE — personal/user-value content, or content the user may
+      reasonably want (I7 floor: never SAFE_TO_DELETE).
+    - PROTECTED_CRITICAL — protected Windows/system/application-critical
+      content (I6 floor: never deletable).
+    - KNOWN_NON_DISPOSABLE — understood/classified but not positively disposable.
+    - UNKNOWN — insufficient evidence (I3 floor: at most REVIEW_FIRST;
+      ``UNKNOWN_BLOCK = 0.0``).
+    """
+
+    DISPOSABLE = "disposable"
+    USER_VALUE = "user_value"
+    PROTECTED_CRITICAL = "protected_critical"
+    KNOWN_NON_DISPOSABLE = "known_non_disposable"
+    UNKNOWN = "unknown"
