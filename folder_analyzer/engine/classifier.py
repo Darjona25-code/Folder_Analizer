@@ -39,6 +39,16 @@ from .kb import classify as kb_classify
 from .kb._norm import components
 from .models import Assessment, FileEntry
 
+__all__ = [
+    "CATEGORY_POLICY",
+    "CategoryPolicy",
+    "classify_entry",
+    "classify_path",
+    "bucket_for_category",
+    "bucket_for_entry",
+    "bucket_for_assessment",
+]
+
 # ---------------------------------------------------------------------------
 # Category policy table — the single source of mapping truth.
 #
@@ -214,15 +224,22 @@ def bucket_for_category(category: str, path: str = "") -> CompositionBucket:
     return _policy_for(category).bucket
 
 
-def bucket_for_entry(entry: FileEntry) -> CompositionBucket:
-    """Bucket for a classified FileEntry.
+def bucket_for_assessment(assessment: Assessment, path: str) -> CompositionBucket:
+    """Bucket for an Assessment + its path.
 
-    Items flagged NOT_RESOLVABLE aggregate as UNKNOWN-category bytes (roadmap
-    §11: any folder with a NOT_RESOLVABLE descendant stays at most
-    REVIEW_FIRST via R3, ``UNKNOWN_BLOCK = 0.0``).
+    Items flagged NOT_RESOLVABLE (reason_key "not_resolvable") aggregate as
+    UNKNOWN-category bytes (roadmap §11: any folder with a NOT_RESOLVABLE
+    descendant stays at most REVIEW_FIRST via R3, ``UNKNOWN_BLOCK = 0.0``).
     """
-    if entry.assessment is not None and entry.assessment.reason_key == "not_resolvable":
+    if assessment is not None and assessment.reason_key == "not_resolvable":
         return CompositionBucket.UNKNOWN
+    return bucket_for_category(assessment.detected_category or "unknown", path)
+
+
+def bucket_for_entry(entry: FileEntry) -> CompositionBucket:
+    """Bucket for a classified FileEntry (assessment-aware when present)."""
+    if entry.assessment is not None:
+        return bucket_for_assessment(entry.assessment, entry.path)
     return bucket_for_category(entry.category, entry.path)
 
 
@@ -304,13 +321,3 @@ def classify_entry(entry: FileEntry, *, not_resolvable: bool = False) -> Assessm
         filename=entry.filename,
         not_resolvable=not_resolvable,
     )
-
-
-__all__ = [
-    "CATEGORY_POLICY",
-    "CategoryPolicy",
-    "classify_entry",
-    "classify_path",
-    "bucket_for_category",
-    "bucket_for_entry",
-]

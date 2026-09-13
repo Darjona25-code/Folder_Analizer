@@ -26,10 +26,10 @@ from __future__ import annotations
 import heapq
 import os
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Set, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 from .enums import DeletionRecommendation
-from .models import AnalysisState, FileEntry
+from .models import AnalysisState, Assessment, FileEntry
 
 
 @dataclass(frozen=True)
@@ -46,12 +46,16 @@ def build_file_entry(
     *,
     is_representative: bool = False,
     analysis_state: AnalysisState = AnalysisState.ANALYZED,
+    assessment=None,
+    category: str = "unknown",
 ) -> FileEntry:
     """Build a metadata record from a DirEntry + its already-fetched stat.
 
     Zero additional syscalls: everything comes from the DirEntry scandir cache
     (name, path, is_symlink) and from ``st`` — the same stat-result the caller
-    fetched for the file size.
+    fetched for the file size. ``assessment`` and ``category`` come from the
+    Phase 5 classification layer and are attached when the caller supplies them
+    (retained-subset materialization); nothing here performs classification.
     """
     name = entry.name
     _, extension = os.path.splitext(name)
@@ -71,45 +75,103 @@ def build_file_entry(
         },
         is_representative=is_representative,
         analysis_state=analysis_state,
+        assessment=assessment,
+        category=category,
     )
 
 
 def select_folder_raw(
     raw_items: Iterable[Tuple[os.DirEntry, os.stat_result]],
     per_folder_cap: int,
+    *,
+    assessments: Optional[Mapping[str, Assessment]] = None,
 ) -> List[FileEntry]:
     """Pick the FileEntry records a single folder may contribute.
 
     Materializes full FileEntry objects ONLY for the kept subset (the rest stay
     analyzed-count-only, never allocated) — this keeps 50k-file scans cheap.
     Selection mirrors ``select_folder_records``: one representative per category
-    (Phase 3: one "unknown" category -> the first record) plus the largest
-    files, capped by ``per_folder_cap``. Returned records are RETAINED.
+    plus the largest files, capped by ``per_folder_cap``. Returned records are
+    RETAINED.
+
+    ``assessments`` maps path -> Assessment (Phase 5 classification). When
+    provided, categories come from the classification and kept records carry
+    their Assessment (activating the non-SAFE retention priority); without it
+    the Phase-3 behavior is preserved (single "unknown" representative, no
+    assessment). No classification is performed inside retention.
     """
     if per_folder_cap <= 0:
         return []
     items = list(raw_items)
     if not items:
         return []
-    representative = items[0]
-    representative_idx = 0
-    remaining = per_folder_cap - 1
+
+    if assessments is None:
+        representative = items[0]
+        representative_idx = 0
+        remaining = per_folder_cap - 1
+        if remaining > 0:
+            rest = sorted(
+                items[1:],
+                key=lambda it: (-it[1].st_size, it[0].path),
+            )[:remaining]
+        else:
+            rest = []
+        picked: List[Tuple[os.DirEntry, os.stat_result, bool]] = [
+            (representative[0], representative[1], True)
+        ]
+        picked.extend((entry, st, False) for entry, st in rest)
+        return [
+            build_file_entry(entry, st, is_representative=rep,
+                             analysis_state=AnalysisState.RETAINED)
+            for entry, st, rep in picked
+        ]
+
+    # Phase 5: one representative per category (its first item in encounter
+    # order), then the largest remaining files up to the cap.
+    representatives: List[Tuple[os.DirEntry, os.stat_result]] = []
+    seen_categories: Set[str] = set()
+    for entry, st in items:
+        category = getattr(assessments.get(entry.path), "detected_category", None) \
+            or "unknown"
+        if category not in seen_categories:
+            seen_categories.add(category)
+            representatives.append((entry, st))
+    remaining = per_folder_cap - len(representatives)
+    rest = []
     if remaining > 0:
-        rest = sorted(
-            items[1:],
+        rest_items = sorted(
+            items,
             key=lambda it: (-it[1].st_size, it[0].path),
-        )[:remaining]
-    else:
-        rest = []
-    picked: List[Tuple[os.DirEntry, os.stat_result, bool]] = [
-        (representative[0], representative[1], True)
-    ]
-    picked.extend((entry, st, False) for entry, st in rest)
-    return [
-        build_file_entry(entry, st, is_representative=rep,
-                         analysis_state=AnalysisState.RETAINED)
-        for entry, st, rep in picked
-    ]
+        )
+        rep_paths = {e.path for e, _ in representatives}
+        rest = [
+            (e, st) for e, st in rest_items
+            if e.path not in rep_paths
+        ][:remaining]
+    returned = []
+
+    def _category_for(entry) -> str:
+        assessment = assessments.get(entry.path)
+        if assessment is not None and assessment.detected_category:
+            return assessment.detected_category
+        return "unknown"
+
+    for entry, st in representatives:
+        returned.append(build_file_entry(
+            entry, st, is_representative=True,
+            analysis_state=AnalysisState.RETAINED,
+            assessment=assessments.get(entry.path),
+            category=_category_for(entry),
+        ))
+    for entry, st in rest:
+        returned.append(build_file_entry(
+            entry, st, is_representative=False,
+            analysis_state=AnalysisState.RETAINED,
+            assessment=assessments.get(entry.path),
+            category=_category_for(entry),
+        ))
+    return returned
 
 
 def _priority(entry: FileEntry) -> Tuple[int, int, int, str]:
@@ -221,6 +283,8 @@ class RetainedFileStore:
         self,
         folder_path: str,
         raw_items: Iterable[Tuple[os.DirEntry, os.stat_result]],
+        *,
+        assessments: Optional[Mapping[str, Assessment]] = None,
     ) -> int:
         """Register a folder's analyzed records; returns how many were retained.
 
@@ -228,8 +292,15 @@ class RetainedFileStore:
         else largest), merges into the global budget and evicts lowest-priority
         records when the budget is exceeded. Eviction here affects only the
         retained count, never the ANALYZED count (owned by the scanner).
+
+        ``assessments`` (path -> Assessment, Phase 5 classification) is used
+        for per-category representatives and is attached to the retained records
+        so the non-SAFE retention priority becomes live; retention never
+        classifies.
         """
-        selected = select_folder_raw(raw_items, self.config.per_folder_cap)
+        selected = select_folder_raw(
+            raw_items, self.config.per_folder_cap, assessments=assessments,
+        )
         return self._record_selected(folder_path, selected)
 
     def add_entries(

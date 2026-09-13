@@ -46,9 +46,9 @@ def _make_entry(path: str, size: int, assessment=None, category: str = "unknown"
     )
 
 
-def _make_tree(n_files=2, n_subdirs=1, name_prefix="file", content="x"):
+def _make_tree(n_files=2, n_subdirs=1, name_prefix="file", content="x", base=None):
     """Root with n_files direct files and n_subdirs subdirs each with n_files."""
-    tmpdir = tempfile.mkdtemp()
+    tmpdir = tempfile.mkdtemp(dir=base) if base else tempfile.mkdtemp()
     for i in range(n_files):
         with open(os.path.join(tmpdir, f"{name_prefix}{i}.txt"), "w") as f:
             f.write(content)
@@ -65,9 +65,9 @@ def _make_tree(n_files=2, n_subdirs=1, name_prefix="file", content="x"):
 # Metadata correctness (Level 1 = metadata only, no classification)
 # ---------------------------------------------------------------------------
 
-def test_file_entry_metadata_extracted():
+def test_file_entry_metadata_extracted(scan_sandbox):
     import os as _os
-    tmpdir = _make_tree(n_files=2, n_subdirs=0)
+    tmpdir = _make_tree(n_files=2, n_subdirs=0, base=scan_sandbox)
     try:
         scanner = Scanner(max_workers=2)
         scanner.scan(tmpdir)
@@ -86,8 +86,11 @@ def test_file_entry_metadata_extracted():
         assert set(record.attributes) == {
             "st_mode", "st_ino", "st_nlink", "is_symlink"
         }
-        assert record.assessment is None
-        assert record.category == "unknown"
+        # Phase 5: classification is now LIVE from the scanner, so records carry
+        # their real assessment/category instead of the Phase-3 placeholders.
+        assert record.assessment is not None
+        assert record.assessment.recommendation is DeletionRecommendation.REVIEW_FIRST
+        assert record.category == "documents"
     finally:
         _shutil_rmtree(tmpdir)
 
@@ -229,6 +232,32 @@ def test_non_safe_records_survive_eviction_over_largest():
     assert retained_paths == {"C:\\f\\small1.bin", "C:\\f\\small2.bin"}
 
 
+def test_scanner_retention_discriminates_non_safe_via_real_classification(scan_sandbox):
+    """Phase 5: retention priority 1 (non-SAFE first) is LIVE from the scanner's
+    real classification — not just synthetic. A small non-SAFE document must
+    outlive a huge SAFE cache file under a tight global budget."""
+    tmpdir = os.path.join(scan_sandbox, "mix")
+    os.makedirs(tmpdir)
+    try:
+        path_huge = os.path.join(tmpdir, "huge_cache.tmp")
+        path_doc = os.path.join(tmpdir, "important_small.pdf")
+        with open(path_huge, "w") as f:
+            f.write("x" * 100_000)
+        with open(path_doc, "w") as f:
+            f.write("important")
+        scanner = Scanner(max_workers=1, retention=RetentionConfig(
+            global_budget=1, per_folder_cap=5))
+        scanner.scan(tmpdir)
+        retained = scanner.records_for(tmpdir)
+        assert {r.path for r in retained} == {path_doc}
+        # The retained record really carries its non-SAFE assessment (priority 1).
+        assert retained[0].assessment is not None
+        assert retained[0].assessment.recommendation is DeletionRecommendation.REVIEW_FIRST
+        assert retained[0].size < 100_000  # survived despite being far smaller
+    finally:
+        _shutil_rmtree(tmpdir)
+
+
 def test_representative_sample_kept_even_if_smallest():
     """One representative per (folder, category) beats raw size."""
     store = RetainedFileStore(RetentionConfig(global_budget=1, per_folder_cap=3))
@@ -320,23 +349,39 @@ def test_files_analyzed_equals_total_even_under_eviction():
         _shutil_rmtree(tmpdir)
 
 
-def test_aggregation_shape_is_defined_and_zero_until_phase5():
-    tmpdir = _make_tree(n_files=2, n_subdirs=1)
+def test_aggregation_shape_is_fully_populated_after_phase5(scan_sandbox):
+    """Phase 5: the aggregation's by_*/protected/user_data/composition/assessment
+    are now populated with real classification over the folder's analyzed files."""
+    tmpdir = _make_tree(n_files=2, n_subdirs=1, base=scan_sandbox)
     try:
         scanner = Scanner(max_workers=1)
         scanner.scan(tmpdir)
         agg = scanner.aggregation_for(tmpdir)
         assert agg.files_analyzed == 2
-        assert agg.unknown_count == agg.files_analyzed  # Phase 3: all unclassified
+        # `.txt` classifies as documents (Tier 3) -> USER_VALUE / REVIEW_FIRST
+        # / LOW impact / HIGH confidence, never UNKNOWN.
+        assert agg.unknown_count == 0
+        assert agg.unknown_size == 0
         assert set(agg.by_recommendation) == set(DeletionRecommendation)
-        assert all(v == 0 for v in agg.by_recommendation.values())
+        assert agg.by_recommendation[DeletionRecommendation.REVIEW_FIRST] == 2
+        assert agg.by_recommendation[DeletionRecommendation.SAFE_TO_DELETE] == 0
         assert set(agg.by_impact) == set(SystemImpact)
-        assert all(v == 0 for v in agg.by_impact.values())
+        assert agg.by_impact[SystemImpact.LOW] == 2
+        assert agg.by_impact[SystemImpact.UNKNOWN] == 0
         assert set(agg.by_confidence) == set(ConfidenceLevel)
-        assert all(v == 0 for v in agg.by_confidence.values())
+        assert agg.by_confidence[ConfidenceLevel.HIGH] == 2
         assert agg.protected_count == 0 and agg.protected_size == 0
-        assert agg.user_data_count == 0 and agg.user_data_size == 0
+        assert agg.user_data_count == 2
+        assert agg.user_data_size == agg.composition.total_bytes
         assert agg.app_ids == {}
+        # Per-folder composition: direct analyzed bytes, exhaustive buckets.
+        assert agg.composition is not None
+        assert agg.composition.total_bytes == agg.composition.user_value_bytes
+        assert sum(agg.composition.buckets.values()) == agg.composition.total_bytes
+        # Folder-level assessment derived via roadmap §11 (R2: user value).
+        assert agg.assessment is not None
+        assert agg.assessment.recommendation is DeletionRecommendation.REVIEW_FIRST
+        assert agg.assessment.reason_key == "r2_user_value"
     finally:
         _shutil_rmtree(tmpdir)
 
