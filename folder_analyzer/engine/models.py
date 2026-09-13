@@ -45,7 +45,7 @@ def apply_confidence_gate(
     return recommendation
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Assessment:
     """Immutable per-item safety assessment (three-axis model).
 

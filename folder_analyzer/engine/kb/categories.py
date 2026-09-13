@@ -54,6 +54,13 @@ _TIER2_PATTERNS: "tuple[tuple[str, frozenset[str]], ...]" = (
     ("cache", frozenset({"cache", "caches", ".cache", "temp", "tmp", "__pycache__", ".gradle"})),
 )
 
+# Union of all Tier-2 markers: single-set membership pass decides whether any
+# path component hits at all; the group loop then only runs for matching paths
+# (the overwhelmingly common no-match case pays one pass, not six).
+_TIER2_MARKERS = frozenset(
+    marker for _category, markers in _TIER2_PATTERNS for marker in markers
+)
+
 # Tier 3 — extension category table (lowercased, with leading dot).
 _EXTENSIONS: "dict[str, str]" = {
     # -- temp/cache --
@@ -106,16 +113,17 @@ _EXTENSIONS: "dict[str, str]" = {
 }
 
 
-def classify(path: str) -> Optional[KBResult]:
+def classify(path: str, *, _key: Optional[str] = None) -> Optional[KBResult]:
     """Tiers 2 then 3: component patterns before extension evidence."""
-    key = norm(path)
+    key = _key if _key is not None else norm(path)
     parts = components(key)
 
-    for category, markers in _TIER2_PATTERNS:
-        if any(part in markers for part in parts):
-            return KBResult(path=key, category=category, tier=2,
-                            confidence_hint="medium",
-                            detail="tier2:component")
+    if any(part in _TIER2_MARKERS for part in parts):
+        for category, markers in _TIER2_PATTERNS:
+            if any(part in markers for part in parts):
+                return KBResult(path=key, category=category, tier=2,
+                                confidence_hint="medium",
+                                detail="tier2:component")
 
     if not parts:
         return None

@@ -23,6 +23,7 @@ scan path; ``classifier.py``/``recommender.py`` wiring is Phase 5.
 from __future__ import annotations
 
 import os
+from typing import Optional
 
 from .result import KBResult
 
@@ -41,27 +42,38 @@ _TIERS = (
     (5, "registry"),
 )
 
+_TIER_MODULES = None
 
-def classify(path: str) -> KBResult:
-    """Tiered dispatch: Tier 0 -> 5, first match wins, else ``unknown``."""
-    from . import apps, categories, env_paths, known_paths, registry
 
-    _modules = {
-        "known_paths": known_paths,
-        "env_paths": env_paths,
-        "categories": categories,
-        "apps": apps,
-        "registry": registry,
-    }
+def _tier_modules():
+    """Lazy once-per-process module map (never rebuilt per classification
+    call — the 50k-file scan path classifies every file)."""
+    global _TIER_MODULES
+    if _TIER_MODULES is None:
+        from . import apps, categories, env_paths, known_paths, registry
+
+        _TIER_MODULES = {
+            "known_paths": known_paths,
+            "env_paths": env_paths,
+            "categories": categories,
+            "apps": apps,
+            "registry": registry,
+        }
+    return _TIER_MODULES
+
+
+def classify(path: str, *, _key: Optional[str] = None) -> KBResult:
+    """Tiered dispatch: Tier 0 -> 5, first match wins, else ``unknown``.
+
+    ``_key`` is the pre-normalized path (kb owns the single normalization when
+    it is the caller's entry point); direct tier test callers omit it.
+    """
+    key = _key if _key is not None else os.path.normcase(os.path.normpath(path))
     for _tier, module_name in _TIERS:
-        result = _modules[module_name].classify(path)
+        result = _tier_modules()[module_name].classify(path, _key=key)
         if result is not None:
             return result
-    return KBResult(
-        path=os.path.normcase(os.path.normpath(path)),
-        category="unknown",
-        confidence_hint="low",
-    )
+    return KBResult(path=key, category="unknown", confidence_hint="low")
 
 
 def classify_content(path: str, level: int = 2) -> KBResult:

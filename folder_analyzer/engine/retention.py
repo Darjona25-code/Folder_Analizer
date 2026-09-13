@@ -28,6 +28,7 @@ import os
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
+from .classifier import ScanAssessment, assessment_from_scan_record
 from .enums import DeletionRecommendation
 from .models import AnalysisState, Assessment, FileEntry
 
@@ -84,7 +85,7 @@ def select_folder_raw(
     raw_items: Iterable[Tuple[os.DirEntry, os.stat_result]],
     per_folder_cap: int,
     *,
-    assessments: Optional[Mapping[str, Assessment]] = None,
+    assessments: "Optional[Mapping[str, Assessment | ScanAssessment]]" = None,
 ) -> List[FileEntry]:
     """Pick the FileEntry records a single folder may contribute.
 
@@ -94,10 +95,12 @@ def select_folder_raw(
     plus the largest files, capped by ``per_folder_cap``. Returned records are
     RETAINED.
 
-    ``assessments`` maps path -> Assessment (Phase 5 classification). When
-    provided, categories come from the classification and kept records carry
-    their Assessment (activating the non-SAFE retention priority); without it
-    the Phase-3 behavior is preserved (single "unknown" representative, no
+    ``assessments`` maps path -> ScanAssessment (Phase 5, allocation-lean
+    classification record). When provided, categories come from the
+    classification and KEPT records carry their full Assessment — materialized
+    lazily here for the selected subset only, so 50k per-file Assessments are
+    never built — activating the non-SAFE retention priority; without it the
+    Phase-3 behavior is preserved (single "unknown" representative, no
     assessment). No classification is performed inside retention.
     """
     if per_folder_cap <= 0:
@@ -161,14 +164,18 @@ def select_folder_raw(
         returned.append(build_file_entry(
             entry, st, is_representative=True,
             analysis_state=AnalysisState.RETAINED,
-            assessment=assessments.get(entry.path),
+            assessment=assessment_from_scan_record(
+                assessments.get(entry.path),
+            ) if assessments.get(entry.path) is not None else None,
             category=_category_for(entry),
         ))
     for entry, st in rest:
         returned.append(build_file_entry(
             entry, st, is_representative=False,
             analysis_state=AnalysisState.RETAINED,
-            assessment=assessments.get(entry.path),
+            assessment=assessment_from_scan_record(
+                assessments.get(entry.path),
+            ) if assessments.get(entry.path) is not None else None,
             category=_category_for(entry),
         ))
     return returned
@@ -284,7 +291,7 @@ class RetainedFileStore:
         folder_path: str,
         raw_items: Iterable[Tuple[os.DirEntry, os.stat_result]],
         *,
-        assessments: Optional[Mapping[str, Assessment]] = None,
+        assessments: "Optional[Mapping[str, Assessment | ScanAssessment]]" = None,
     ) -> int:
         """Register a folder's analyzed records; returns how many were retained.
 

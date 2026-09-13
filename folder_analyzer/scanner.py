@@ -26,14 +26,18 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
 
-from .engine.classifier import bucket_for_assessment, classify_path
+from .engine.classifier import (
+    ScanAssessment,
+    assessment_from_scan_record,
+    classify_scan,
+)
 from .engine.enums import (
     CompositionBucket,
     ConfidenceLevel,
     DeletionRecommendation,
     SystemImpact,
 )
-from .engine.models import Assessment, FileEntry, FolderAggregation, FolderComposition, ScanResult
+from .engine.models import FileEntry, FolderAggregation, FolderComposition, ScanResult
 from .engine.recommender import derive_folder_recommendation
 from .engine.retention import (
     RetainedFileStore,
@@ -101,36 +105,35 @@ class _FolderTally:
     unknown_bytes: int = 0
 
 
-def _bump(tally: _FolderTally, size: int, assessment: Assessment, path: str) -> None:
+def _bump(tally: _FolderTally, size: int, rec: ScanAssessment) -> None:
     """Fold one classified file into the folder tally (no per-file retention)."""
-    tally.by_impact[assessment.impact] += 1
-    tally.by_recommendation[assessment.recommendation] += 1
-    tally.by_confidence[assessment.confidence] += 1
-    bucket = bucket_for_assessment(assessment, path)
-    if bucket is CompositionBucket.DISPOSABLE:
+    tally.by_impact[rec.impact] += 1
+    tally.by_recommendation[rec.recommendation] += 1
+    tally.by_confidence[rec.confidence] += 1
+    if rec.bucket is CompositionBucket.DISPOSABLE:
         tally.disposable_bytes += size
-    elif bucket is CompositionBucket.USER_VALUE:
+    elif rec.bucket is CompositionBucket.USER_VALUE:
         tally.user_value_bytes += size
-    elif bucket is CompositionBucket.PROTECTED_CRITICAL:
+    elif rec.bucket is CompositionBucket.PROTECTED_CRITICAL:
         tally.protected_critical_bytes += size
-    elif bucket is CompositionBucket.KNOWN_NON_DISPOSABLE:
+    elif rec.bucket is CompositionBucket.KNOWN_NON_DISPOSABLE:
         tally.known_non_disposable_bytes += size
     else:
         tally.unknown_bytes += size
         tally.unknown_count += 1
         tally.unknown_size += size
-    if bucket is CompositionBucket.PROTECTED_CRITICAL:
+    if rec.bucket is CompositionBucket.PROTECTED_CRITICAL:
         tally.protected_count += 1
         tally.protected_size += size
-    if assessment.reason_key == "not_resolvable":
+    if rec.reason_key == "not_resolvable":
         tally.not_resolvable_count += 1
-    if assessment.is_user_data:
+    if rec.is_user_data:
         tally.user_data_count += 1
         tally.user_data_size += size
-    if assessment.app_id is not None:
-        tally.app_ids[assessment.app_id] = tally.app_ids.get(assessment.app_id, 0) + 1
-    tally.by_category[assessment.detected_category or "unknown"] = (
-        tally.by_category.get(assessment.detected_category or "unknown", 0) + size
+    if rec.app_id is not None:
+        tally.app_ids[rec.app_id] = tally.app_ids.get(rec.app_id, 0) + 1
+    tally.by_category[rec.detected_category or "unknown"] = (
+        tally.by_category.get(rec.detected_category or "unknown", 0) + size
     )
 
 
@@ -184,7 +187,7 @@ class Scanner:
 
         subdirs: List[os.DirEntry] = []
         pending: List[Tuple[os.DirEntry, os.stat_result]] = []
-        assessments: "Dict[str, Assessment]" = {}
+        assessments: "Dict[str, ScanAssessment]" = {}
         tally = _FolderTally()
         for entry in entries:
             try:
@@ -201,18 +204,18 @@ class Scanner:
                     info.direct_size += st.st_size
                     info.file_count += 1
                     try:
-                        assessment = classify_path(
+                        rec = classify_scan(
                             entry.path, filename=entry.name,
                         )
                     except Exception:
                         # Classification must never break the scan: degrade to
                         # the NOT_RESOLVABLE pipeline (UNKNOWN/REVIEW_FIRST/LOW).
-                        assessment = classify_path(
+                        rec = classify_scan(
                             entry.path, filename=entry.name,
                             not_resolvable=True,
                         )
-                    assessments[entry.path] = assessment
-                    _bump(tally, st.st_size, assessment, entry.path)
+                    assessments[entry.path] = rec
+                    _bump(tally, st.st_size, rec)
                     with self._lock:
                         self._scanned_files += 1
                 elif entry.is_dir(follow_symlinks=False):
@@ -312,7 +315,7 @@ class Scanner:
     def _rescan_folder_records(self, folder_path: str) -> Tuple[FileEntry, ...]:
         """Single-folder re-scan (direct files only) for evicted drill-down."""
         pending: List[Tuple[os.DirEntry, os.stat_result]] = []
-        assessments: "Dict[str, Assessment]" = {}
+        assessments: "Dict[str, ScanAssessment]" = {}
         try:
             for entry in os.scandir(folder_path):
                 try:
@@ -320,11 +323,11 @@ class Scanner:
                         st = entry.stat(follow_symlinks=False)
                         pending.append((entry, st))
                         try:
-                            assessments[entry.path] = classify_path(
+                            assessments[entry.path] = classify_scan(
                                 entry.path, filename=entry.name,
                             )
                         except Exception:
-                            assessments[entry.path] = classify_path(
+                            assessments[entry.path] = classify_scan(
                                 entry.path, filename=entry.name,
                                 not_resolvable=True,
                             )

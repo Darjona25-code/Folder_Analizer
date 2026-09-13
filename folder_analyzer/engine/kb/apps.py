@@ -38,8 +38,8 @@ _TIER4_PATTERNS: "tuple[tuple[str, frozenset[str]], ...]" = (
 )
 
 
-def classify(path: str) -> Optional[KBResult]:
-    key = norm(path)
+def classify(path: str, *, _key: Optional[str] = None) -> Optional[KBResult]:
+    key = _key if _key is not None else norm(path)
     parts = components(key)
     for category, markers in _TIER4_PATTERNS:
         if any(part in markers for part in parts):

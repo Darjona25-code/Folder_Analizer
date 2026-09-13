@@ -27,7 +27,7 @@ positive guess. This honors I1 (uncertainty never increases deletion authority).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Dict, Optional
 
 from .enums import (
     CompositionBucket,
@@ -42,8 +42,11 @@ from .models import Assessment, FileEntry
 __all__ = [
     "CATEGORY_POLICY",
     "CategoryPolicy",
+    "ScanAssessment",
+    "assessment_from_scan_record",
     "classify_entry",
     "classify_path",
+    "classify_scan",
     "bucket_for_category",
     "bucket_for_entry",
     "bucket_for_assessment",
@@ -58,6 +61,32 @@ __all__ = [
 # purpose (roadmap §12 "positive-evidence categories"). Tier 2/4 pattern
 # categories (``dev``, ``ai_ml``, ``app:*``, …) keep MEDIUM.
 # ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class ScanAssessment:
+    """Lightweight, allocation-lean per-item classification (Phase 5 scan path).
+
+    Carries exactly the fields the 50k-file scan actually consumes (counters,
+    bucket tallies, retention priority, retained-record materialization) without
+    the full ``Assessment`` object / ``__post_init__`` construction. The full
+    ``Assessment`` is materialized lazily — from this record — only for the
+    RETAINED subset via ``assessment_from_scan_record``. Fields are the *final*
+    (post-gate) values: policy floors (I9/I3/I7) are policy-encoded, so no
+    construction-time gate can diverge them (``Assessment`` re-applies the gate
+    idempotently).
+    """
+
+    impact: SystemImpact
+    confidence: ConfidenceLevel
+    reason_key: str
+    recommendation: DeletionRecommendation
+    reason_params: Optional[Dict[str, object]]
+    detected_category: Optional[str]
+    app_id: Optional[str]
+    is_user_data: bool
+    is_temporary: bool
+    bucket: CompositionBucket
 
 
 @dataclass(frozen=True)
@@ -271,13 +300,31 @@ def classify_path(
     (__post_init__ applies I9/I3/I7 floors), so no caller can build an
     unrepresentable SAFE_TO_DELETE.
     """
+    return assessment_from_scan_record(
+        classify_scan(path, filename=filename, not_resolvable=not_resolvable)
+    )
+
+
+def classify_scan(
+    path: str,
+    *,
+    filename: Optional[str] = None,
+    not_resolvable: bool = False,
+) -> ScanAssessment:
+    """Classification record for the scan path (allocation-lean; see
+    ``ScanAssessment``). Same verdict as ``classify_path`` by construction."""
     if not_resolvable:
-        return Assessment(
+        return ScanAssessment(
             impact=SystemImpact.UNKNOWN,
             confidence=ConfidenceLevel.LOW,
             reason_key="not_resolvable",
             recommendation=DeletionRecommendation.REVIEW_FIRST,
+            reason_params=None,
             detected_category="unknown",
+            app_id=None,
+            is_user_data=False,
+            is_temporary=False,
+            bucket=CompositionBucket.UNKNOWN,
         )
     kb_result = kb_classify(path)
     policy = _policy_for(kb_result.category)
@@ -301,16 +348,39 @@ def classify_path(
     elif kb_result.category == "app":
         app_id = "installed"
 
-    return Assessment(
+    return ScanAssessment(
         impact=policy.impact,
         confidence=policy.confidence,
         reason_key=_REASON_BY_BUCKET[bucket],
         recommendation=policy.recommendation,
-        reason_params={"category": kb_result.category},
+        reason_params=None,
         detected_category=kb_result.category,
         app_id=app_id,
         is_user_data=policy.is_user_data,
         is_temporary=policy.is_temporary,
+        bucket=bucket,
+    )
+
+
+def assessment_from_scan_record(record: ScanAssessment) -> Assessment:
+    """Materialize the full Assessment for a retained record.
+
+    Idempotent: rebuilding an Assessment from an already-gated ScanAssessment
+    re-applies I9/I3/I7 gates without changing the verdict (policy floors are
+    encoded in the record). Real ``Assessment`` values pass through unchanged.
+    """
+    if isinstance(record, Assessment):
+        return record
+    return Assessment(
+        impact=record.impact,
+        confidence=record.confidence,
+        reason_key=record.reason_key,
+        recommendation=record.recommendation,
+        reason_params=record.reason_params,
+        detected_category=record.detected_category,
+        app_id=record.app_id,
+        is_user_data=record.is_user_data,
+        is_temporary=record.is_temporary,
     )
 
 

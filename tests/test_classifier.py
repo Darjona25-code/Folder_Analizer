@@ -18,11 +18,14 @@ import pytest
 
 from folder_analyzer.engine.classifier import (
     CATEGORY_POLICY,
+    ScanAssessment,
     _DISPOSABLE_MARKERS,
+    assessment_from_scan_record,
     bucket_for_category,
     bucket_for_entry,
     classify_entry,
     classify_path,
+    classify_scan,
 )
 from folder_analyzer.engine.enums import (
     CompositionBucket,
@@ -321,3 +324,49 @@ def test_config_and_dev_are_known_non_disposable_never_safe():
         assert a.recommendation is not DeletionRecommendation.SAFE_TO_DELETE
         assert bucket_for_category(a.detected_category, path) \
             is CompositionBucket.KNOWN_NON_DISPOSABLE
+
+
+def test_scan_record_materializes_identical_assessment():
+    """The allocation-lean scan record is the full Assessment by construction:
+    materializing yields the exact same verdict across every policy path."""
+    paths = (
+        "C:\\Windows\\System32\\ntdll.dll",
+        "C:\\ProgramData\\app\\settings.ini",
+        "C:\\Users\\me\\Downloads\\installer.exe",
+        "C:\\Users\\me\\Documents\\notes.txt",
+        "C:\\dev\\backup\\profiles\\user data\\something.sqlite",
+        "C:\\Chrome\\Cache\\f_0001",
+        "C:\\Chrome\\Cache2\\f_0002",
+        "C:\\firefox\\profile\\Cache\\f_0003",
+        "C:\\odd\\unknown_extension.dat_zz",
+        "C:\\src\\project\\.vscode\\settings.json",
+        "C:\\data\\file.docx",
+        "C:\\games\\steamapps\\common\\game\\config.ini",
+    )
+    for path in paths:
+        rec = classify_scan(path)
+        assert isinstance(rec, ScanAssessment)
+        full = classify_path(path)
+        materialized = assessment_from_scan_record(rec)
+        assert materialized.impact is full.impact
+        assert materialized.confidence is full.confidence
+        assert materialized.reason_key == full.reason_key
+        assert materialized.recommendation is full.recommendation
+        assert materialized.reason_params == full.reason_params
+        assert materialized.detected_category == full.detected_category
+        assert materialized.app_id == full.app_id
+        assert materialized.is_user_data is full.is_user_data
+        assert materialized.is_temporary is full.is_temporary
+        # Bucket carried by the record matches the path-aware bucket mapping.
+        assert rec.bucket is bucket_for_category(rec.detected_category or "unknown", path)
+
+
+def test_scan_record_not_resolvable_pipeline_materializes():
+    rec = classify_scan("C:\\resolver\\mystery.bin", not_resolvable=True)
+    assert rec.bucket is CompositionBucket.UNKNOWN
+    full = assessment_from_scan_record(rec)
+    assert full.recommendation is DeletionRecommendation.REVIEW_FIRST
+    assert full.impact is SystemImpact.UNKNOWN
+    assert full.confidence is ConfidenceLevel.LOW
+    assert full.reason_key == "not_resolvable"
+    assert full.detected_category == "unknown"

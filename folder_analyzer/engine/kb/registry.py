@@ -105,10 +105,10 @@ def _catalog() -> Dict[str, str]:
     return _CATALOG
 
 
-def classify(path: str) -> Optional[KBResult]:
+def classify(path: str, *, _key: Optional[str] = None) -> Optional[KBResult]:
     if winreg is None:
         return None
-    key = norm(path)
+    key = _key if _key is not None else norm(path)
     for root, app in _catalog().items():
         if key == root or key.startswith(root + os.sep):
             return KBResult(path=key, category=_CATEGORY, tier=5,

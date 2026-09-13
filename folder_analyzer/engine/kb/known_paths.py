@@ -23,7 +23,7 @@ import bisect
 import os
 from typing import List, Optional
 
-from ._norm import ancestors, norm
+from ._norm import norm
 from .result import KBResult
 
 _CATEGORY = "system"
@@ -77,21 +77,24 @@ def _resolve_roots() -> "tuple[List[str], List[str]]":
 _EXACT, _TREE = _resolve_roots()
 
 
-def classify(path: str) -> Optional[KBResult]:
+def classify(path: str, *, _key: Optional[str] = None) -> Optional[KBResult]:
     """Tier 0 verdict: ``system`` when the path is a critical root or under one.
 
     ``EXACT`` roots match the path *itself* only (a drive root is critical,
     but its descendants are not — otherwise every user file would be system);
     ``TREE`` roots match the path and every descendant.
+
+    The tree test is a prefix comparison against the small root list instead of
+    materializing the path's full ancestor list (same descendant-or-equal
+    semantics; bound-allocations dropped for the 50k-file scan path).
     """
-    key = norm(path)
+    key = _key if _key is not None else norm(path)
     idx = bisect.bisect_left(_EXACT, key)
     if idx < len(_EXACT) and _EXACT[idx] == key:
         return KBResult(path=key, category=_CATEGORY, tier=0,
                         confidence_hint="high", detail="tier0:exact")
-    for ancestor in ancestors(key):
-        idx = bisect.bisect_left(_TREE, ancestor)
-        if idx < len(_TREE) and _TREE[idx] == ancestor:
+    for root in _TREE:
+        if key == root or key.startswith(root + os.sep):
             return KBResult(path=key, category=_CATEGORY, tier=0,
                             confidence_hint="high", detail="tier0:tree")
     return None

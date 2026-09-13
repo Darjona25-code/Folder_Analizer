@@ -137,8 +137,8 @@ def _resolved() -> List[Tuple[str, str]]:
     return _RESOLVED
 
 
-def classify(path: str) -> Optional[KBResult]:
-    key = norm(path)
+def classify(path: str, *, _key: Optional[str] = None) -> Optional[KBResult]:
+    key = _key if _key is not None else norm(path)
     for category, root in _resolved():
         if key == root or key.startswith(root + os.sep):
             return KBResult(path=key, category=category, tier=1,
