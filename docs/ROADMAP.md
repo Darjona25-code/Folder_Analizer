@@ -648,6 +648,25 @@ Fixed process (re-affirmed):
 4. **Retention/analysis limits** — engineering defaults, configurable.
 5. **PyInstaller/Qt quirks (Phase 11)** — real risk, dedicated phase.
 6. **Registry unavailability (KB T5)** — never affects correctness.
+7. **Phase-5 classification cost (+445% real wall-clock on the 50k fixture)** — the
+   recommendation/composition wiring measured **0.143 s (Phase 4) → 0.782 s (Phase 5)**
+   uninstrumented, pinned P-cores (**5.5×**), deferred to Phase 8 (Performance & Scale).
+   **Decision (Phase 6/7 guardrail): Phases 6 (Exports v2) and 7 (Web UI) must NOT add
+   per-file hot-path processing** — they consume the already-collected `ScanResult`
+   (exports iterate over scan-phase products; web reads the same data) and must not
+   re-scan or re-classify. The regression is carried forward because real-world scan
+   sizes are far below the 50k stress fixture, and the primary optimization window
+   (folder-prefix classification caching, filename-only Tier-3 decisions) is a Phase 8
+   activity. Re-evaluate at every phase close; do not let this regress further.
+8. **Example 6 confidence value provenance (composition model)** — the committed
+   `docs/ROADMAP.md` canonical table has carried `Ex6 = NONE/REVIEW_FIRST/HIGH`
+   (`R2; user consent required`) since the initial Phase-1 scaffold commit
+   (`5998cc42`); no committed revision ever contained MEDIUM, so no approval record of a
+   MEDIUM→HIGH change exists in this repo. If the original approved PDF specified
+   `Ex6 = REVIEW_FIRST/MEDIUM`, the discrepancy originates outside repo history (pre-repo
+   transcription). Per the §11 "internally consistent" note and the roadmap's
+   contradiction-resolution rule, the committed value governs unless a written
+   correction is approved.
 
 ## 25. Total ETA (single authoritative figure)
 

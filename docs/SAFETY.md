@@ -258,6 +258,20 @@ deletion security):
   full UI/exports tooltips are Phase 7.
 - **I9 — Confidence gate** *(implemented)* — SAFE_TO_DELETE requires HIGH confidence;
   enforced at Assessment construction, not post-hoc.
+- **I9 (folder level) — currently-unreachable structural invariant.** The folder-level
+  confidence gate is validated with *synthetic* non-default
+  `CompositionConfig(confidence_gate=MEDIUM/LOW)` tests only
+  (`test_folder_confidence_gate_demotes_r5_eligible_safe_to_review`,
+  `test_folder_safe_never_carries_below_high_confidence_under_default_gate`) and **is NOT
+  reachable through any real classification path today**: every item that reaches the
+  DISPOSABLE composition bucket does so via a pipeline verdict of
+  `SAFE_TO_DELETE + HIGH` (`CATEGORY_POLICY` entries `temp`/`cache`, classifier.py:121-128),
+  so a folder reaching R5 under real data is always HIGH and the constructor gate is
+  trivially satisfied. Like the Phase 3 "non-safe retention placeholder" disclosure, this
+  must not be treated as validated-by-real-data: it becomes live only if a future KB tier
+  or classifier change introduces MEDIUM/LOW-confidence positive-disposable-evidence
+  classifications, at which point the gate is already enforced and tested at the
+  construction boundary (`models.py` `__post_init__`).
 - **I10 — Item-level authority** *(implemented, Phase 5 integration test)* —
   item authority = the item's own immutable `Assessment`; a `SAFE_TO_DELETE`+`HIGH`
   item beneath a folder-derived `REVIEW_FIRST` remains guard-validated; the folder

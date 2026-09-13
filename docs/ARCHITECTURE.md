@@ -275,6 +275,29 @@ baseline n=5 spans 11.64–12.60 (±4%), Phase 5 n=4 spans 13.13–14.37 (±4.5%
 no single-phase reading vs the opposite phase's best/worst exceeds +14%
 (worst-to-worst) — the +20.6% figure was a max-vs-min coincidental pairing.
 
+### 6b. Folder-level confidence gate — currently-unreachable structural invariant
+
+The folder-level confidence gate (I9 applied to `derive_folder_recommendation`'s output)
+is a **structural invariant guard, not currently reachable through any real classification
+path**. The gate fires when an `Assessment` with `recommendation=SAFE_TO_DELETE` carries
+`confidence < HIGH` at construction (`models.py:86`). In the current KB/classifier model,
+every item reaching the DISPOSABLE composition bucket does so via a pipeline verdict of
+`recommendation=SAFE_TO_DELETE + confidence=HIGH` (classifier `bucket_for_assessment` routes
+through `bucket_for_category`; the DISPOSABLE `CATEGORY_POLICY` entries — `temp`, `cache` —
+at classifier.py:121-128 carry `confidence=ConfidenceLevel.HIGH`).
+Since DISPOSABLE evidence is therefore always HIGH, `derive_folder_recommendation`'s R5
+branch stamps `confidence=cfg.confidence_gate` (defaults to HIGH), and the constructor gate
+is trivially satisfied.
+
+The gate is validated with *synthetic* non-default `CompositionConfig(confidence_gate=MEDIUM/LOW)`
+tests (`test_folder_confidence_gate_demotes_r5_eligible_safe_to_review`,
+`test_folder_safe_never_carries_below_high_confidence_under_default_gate`) that prove the
+mechanism fires at construction and that the pipeline cannot produce SAFE+non-HIGH under
+defaults. This must not be treated as "validated by real data" — the gate becomes meaningful
+only if a future KB tier or classifier change introduces MEDIUM/LOW-confidence
+positive-disposable-evidence classifications. The test suite treats the structural invariant
+as a regression guard, not a live code path.
+
 > **RSS trend watch (Phase 5 close):** the historical Phase-1–4 rows used RSS-delta,
 > which is a core-scheduling/working-set artifact on this hardware (±30% noise is
 > larger than the 20% gate). The corrected methodology measures the two
