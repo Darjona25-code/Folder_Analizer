@@ -60,15 +60,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   skipped**.
 - **Docs:** `docs/ARCHITECTURE.md` (module map → Phase 5, scanner flow, KB wiring,
   phase-5 baseline row), `docs/SAFETY.md`, `docs/ROADMAP.md` Phase 5 → COMPLETE.
-- **Ex6 confidence resolution (Phase-5 close):** after the approved source document
-  was supplied, the §11 canonical `Ex6 = NONE/REVIEW_FIRST/HIGH` value was confirmed
-  as a **deliberate, documented correction** of the source draft's `MEDIUM` (approved
-  2026-09-13) — routing through §24 risk item 8 with a confidence-independence-
-  axiom justification (`unknown_pct = 0` ⇒ high classification certainty; REVIEW_FIRST
-  is the R2/I7 policy floor, independent of certainty). No code or test change: the
-  R2 branch already stamps HIGH, the composition test already asserts `ConfidenceLevel.HIGH`.
-  The earlier "committed value governs" provenance framing is replaced by the
-  explicit approved-correction note; Ex6 remains `NONE/REVIEW_FIRST/HIGH`.
+- **Ex6 confidence resolution (Phase-5 close):** with the approved source supplied, the
+  interim HIGH rationale (`d6ba116`) was checked against the source's own cross-example
+  pattern — Ex4 (5% unknown) / Ex6 (0% unknown) / Ex7 (~5% unknown) all carry MEDIUM, so
+  folder-level REVIEW_FIRST confidence does NOT track unknown-byte share. Ex6
+  **reverted to the source's MEDIUM**: the value follows the source verbatim, folder-level
+  derived confidence is re-stated as aggregate-verdict certainty over a heterogeneous
+  composition (§2), and `derive_folder_recommendation`'s R2 branch now stamps
+  `MEDIUM` (was HIGH) while the Downloads-policy floor (Ex8) and R1/R5 keep HIGH.
+  Item-level confidence (§2) is unaffected. Docs: §2 folder-level clarification,
+  §11 table row 6 + footnote, §24 risk item 8 reversion note.
 
 ### Added (Phase 4 — Knowledge Base, standalone / not wired)
 

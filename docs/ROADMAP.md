@@ -88,6 +88,14 @@ document may be `System Impact: NONE | Recommendation: REVIEW_FIRST | Confidence
 HIGH` — we are highly confident it is a personal file; we are NOT confident the user
 wants it deleted.
 
+At the folder level (Phase 5, §11), derived REVIEW_FIRST confidence measures certainty
+of the SINGLE aggregate verdict over the composition — not byte-classification certainty
+(item-level, above). A heterogeneous mix of structurally distinct categories is harder
+to summarize in one verdict and therefore carries MEDIUM even when every byte is
+individually well-classified (Ex6: `unknown_pct = 0` yet MEDIUM, matching Ex4/Ex7);
+HIGH is reserved for near-homogeneous or single-policy-determined compositions (Ex1,
+Ex2, Ex8, R1 hard rule).
+
 **Confidence gate (mandatory):** `IF recommendation == SAFE_TO_DELETE AND confidence
 != HIGH → promote to REVIEW_FIRST`. A SAFE_TO_DELETE with non-HIGH confidence is not
 expressible.
@@ -288,14 +296,16 @@ deletion trustworthiness over maximizing the number of SAFE_TO_DELETE results.
 | 3 | Mixed disposable + critical | HIGH | DO_NOT_DELETE | HIGH | R1 hard rule |
 | 4 | 95% disposable + 5% UNKNOWN | LOW | REVIEW_FIRST | MEDIUM | R3 strict: any UNKNOWN blocks; majority-safe insufficient |
 | 5 | 60% cache + 40% UNKNOWN | UNKNOWN | REVIEW_FIRST | LOW | Large unknown; cannot assess |
-| 6 | Personal docs + app data | NONE | REVIEW_FIRST | HIGH | R2; user consent required |
+| 6 | Personal docs + app data | NONE | REVIEW_FIRST | MEDIUM | R2; user consent required |
 | 7 | `C:\Users` | HIGH | DO_NOT_DELETE | HIGH | Protected; profiles + app data |
 | 8 | `Downloads` | LOW | REVIEW_FIRST | HIGH | Policy; per-file assessments vary |
 
-Ex6 confidence footnote: HIGH is a deliberate correction of the approved source draft's
-MEDIUM (approved 2026-09-13) — confidence-independence: classification certainty is high
-(`unknown_pct = 0`), and REVIEW_FIRST is the R2/I7 policy floor, independent of certainty.
-See §24 risk item 8 for the full justification.
+Ex6 confidence footnote: MEDIUM is the approved-source value (reverted 2026-09-13). The
+source's Ex4 (5% unknown) / Ex6 (0% unknown) / Ex7 (~5% unknown) all carry MEDIUM, so
+folder-level REVIEW_FIRST confidence does NOT track unknown-byte share — it reflects
+certainty of ONE aggregate verdict over a heterogeneous composition (Ex6 spans docs +
+config + temp). Folder-level HIGH is reserved for near-homogeneous or single-policy
+verdicts (Ex1/Ex2/Ex8/R1). See §24 risk item 8.
 
 Examples 4: the 5% UNKNOWN drives the ceiling via R3 (`UNKNOWN_BLOCK = 0.0`). Constraint
 example (documented): 100 GB folder with 95 GB cache + 5 GB personal documents ⇒
@@ -673,29 +683,32 @@ Fixed process (re-affirmed):
    and the primary optimization window
    (folder-prefix classification caching, filename-only Tier-3 decisions) is a Phase 8
    activity. Re-evaluate at every phase close; do not let this regress further.
-8. **Example 6 confidence value — deliberate correction from the approved source draft
-   (MEDIUM → HIGH).** The approved source document specifies `Ex6 = NONE/REVIEW_FIRST/MEDIUM`
+8. **Example 6 confidence value — REVERTED to the approved source's MEDIUM
+   (2026-09-13).** The approved source specifies `Ex6 = NONE/REVIEW_FIRST/MEDIUM`
    (aggregation: `safe_pct = 0.20`, `protected_pct = 0`, `unknown_pct = 0`,
    `user_data_pct = 0.50`; reason: "Contains a mixture of user documents, application
-   data, and temporary files"). The repo has carried `Ex6 = NONE/REVIEW_FIRST/HIGH`
-   (`R2; user consent required`) since the initial scaffold (`5998cc42`) and **that value
-   is retained as a deliberate design correction, approved 2026-09-13 (Phase-5 close
-   verification), not an unverified drift.** Justification, tied to the model's
-   confidence-independence axiom (ROADMAP §2: confidence measures confidence *in the
-   classification*, NOT confidence that deletion is safe — e.g. a personal document is
-   `NONE/REVIEW_FIRST/HIGH`, cf. `family_photos.zip`): the classification here is
-   high-certainty — the source's own aggregation reports `unknown_pct = 0`, so every byte
-   is confidently typed (50% documents, 30% app config/DB, 20% temp) — and the
-   REVIEW_FIRST recommendation arises purely from R2's user-value short-circuit (I7
-   floor), a deletion-safety judgment independent of classification certainty. MEDIUM
-   would assert classification uncertainty the aggregation contradicts, conflating
-   "mixed composition" with "uncertain classification" — precisely what the §2
-   confidence-semantics passage rejects. The repo is internally consistent under this
-   correction: `engine/recommender.py`'s R2 branch stamps `confidence=HIGH` for the
-   user-value case, the composition test `ex6_personal_docs_app_data` asserts
-   `ConfidenceLevel.HIGH`, and the §11 canonical table carries HIGH. This note replaces
-   the earlier "committed value governs" provenance framing; unless a written source
-   revision re-centers Ex6 as intentionally MEDIUM, HIGH stands as the approved value.
+   data, and temporary files"). An interim commit (`d6ba116`) justified retaining HIGH
+   via the confidence-independence axiom ("`unknown_pct = 0` ⇒ high byte-classification
+   certainty ⇒ HIGH"). That justification does not survive the source's own
+   cross-example pattern: Ex4 (95% cache + 5% unknown) = MEDIUM, Ex7 (C:\Users mix,
+   unknown ≈ 5%) = MEDIUM, and Ex6 itself = MEDIUM despite `unknown_pct = 0` — LESS
+   unknown content than Ex4/Ex7, yet the identical confidence. Unknown-byte share is
+   therefore NOT the variable driving the source's folder-level REVIEW_FIRST confidence.
+   The consistent reading: folder-level derived confidence measures certainty that ONE
+   aggregate verdict adequately summarizes a HETEROGENEOUS composition (the folder's mix
+   of structurally distinct content categories) — lower than byte-level classification
+   certainty (§2 family_photos.zip pattern, item-level) and distinct from
+   single-policy-verdict confidence (Ex8 Downloads = HIGH). Ex6 spans documents +
+   app config/DB + temp — three distinct categories — hence MEDIUM, the same level as
+   Ex4/Ex7. The roadmap documents NO mechanical confidence-derivation rule for the
+   REVIEW_FIRST paths (§11 short-circuits specify only the SAFE constraint
+   `CONFIDENCE_GATE = HIGH`); source-example confidences are authored judgments, and the
+   reverted value follows the source verbatim.
+   **Implementation:** `derive_folder_recommendation`'s R2 (USER_VALUE) branch now stamps
+   `confidence=MEDIUM` (was HIGH), so `r2_user_value` = NONE/REVIEW_FIRST/MEDIUM, consistent
+   with Ex6/Ex7. The Downloads-policy floor stays HIGH (Ex8). R1 (protected-critical) and
+   R5 (SAFE) remain HIGH. Item-level classification confidence is unaffected (§2).
+   This reversion supersedes the interim HIGH-correction rationale in `d6ba116`.
 
 ## 25. Total ETA (single authoritative figure)
 

@@ -199,7 +199,7 @@ CANONICALS = [
         ],
         SystemImpact.NONE,
         DeletionRecommendation.REVIEW_FIRST,
-        ConfidenceLevel.HIGH,
+        ConfidenceLevel.MEDIUM,
         "r2_user_value",
     ),
     (

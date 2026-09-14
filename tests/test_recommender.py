@@ -74,7 +74,10 @@ def test_r2_user_value_is_review_first():
     a = derive_folder_recommendation(None, _comp(uv=100))
     assert a.recommendation is DeletionRecommendation.REVIEW_FIRST
     assert a.impact is SystemImpact.NONE
-    assert a.confidence is ConfidenceLevel.HIGH
+    # Source-authored pattern (Ex6 docs+config+temp / Ex7 C:\Users mix = MEDIUM):
+    # folder-level REVIEW_FIRST confidence reflects aggregate-verdict certainty over
+    # a heterogeneous composition, not byte-classification certainty.
+    assert a.confidence is ConfidenceLevel.MEDIUM
     assert a.reason_key == "r2_user_value"
 
 

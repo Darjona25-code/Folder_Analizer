@@ -27,10 +27,13 @@ The research aligns exactly with roadmap §11 canonical examples:
 | 8      | Downloads (policy)               | LOW   | REVIEW_FIRST | HIGH |
 +--------+----------------------------------+-------+--------------+------+
 
-Ex6 confidence NOTE: HIGH is a deliberate correction of the approved source draft's
-MEDIUM (approved 2026-09-13) — confidence-independence: classification certainty is
-high (`unknown_pct = 0`) and REVIEW_FIRST is the R2/I7 policy floor, independent of
-certainty; see ROADMAP §24 risk item 8.
+Ex6 confidence NOTE: MEDIUM is the approved-source value, restored after an interim
+HIGH rationale was checked against the source's own cross-example pattern — Ex4 (5%
+unknown) / Ex6 (0% unknown) / Ex7 (~5% unknown) all carry MEDIUM, so folder-level
+REVIEW_FIRST confidence does NOT track unknown-byte share. It reflects certainty of
+ONE aggregate verdict over a heterogeneous composition (Ex6 spans docs + config +
+temp); folder-level HIGH is reserved for near-homogeneous or single-policy verdicts
+(Ex1, Ex2, Ex8, R1). see ROADMAP §24 risk item 8.
 
 Short-circuit order R1 -> R2 -> R3 -> R4/R5/R6:
 - R1 any PROTECTED_CRITICAL bytes      -> DO_NOT_DELETE (CRITICAL iff 100%).
@@ -184,10 +187,18 @@ def derive_folder_recommendation(
         )
 
     # R2 (hard): any USER_VALUE byte short-circuits to at most REVIEW_FIRST.
+    # Folder-level REVIEW_FIRST confidence measures certainty of a SINGLE aggregate
+    # verdict over the composition — not byte-classification certainty (that is
+    # item-level, cf. roadmap §2 family_photos pattern). A user-value-bearing folder
+    # spans multiple structurally distinct categories, so the approved source's
+    # authored pattern (Ex6 docs+config+temp = MEDIUM, Ex7 C:\Users mix = MEDIUM —
+    # both REVIEW_FIRST) sets this stamp to MEDIUM. The Downloads-policy floor below
+    # is the one user-content case the source assigns HIGH (single recognized
+    # purpose location, Ex8).
     if comp.user_value_bytes > 0:
         return Assessment(
             impact=SystemImpact.NONE,
-            confidence=ConfidenceLevel.HIGH,
+            confidence=ConfidenceLevel.MEDIUM,
             reason_key="r2_user_value",
             recommendation=DeletionRecommendation.REVIEW_FIRST,
         )
