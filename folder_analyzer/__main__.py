@@ -14,10 +14,11 @@ from .scanner import Scanner, FolderInfo, sort_folders_by_size
 from .reporter import show_top_folders, show_tree, show_folder_detail
 from .treemap import show_treemap
 from .deleter import delete_folders
-from .exporter import export_json, export_csv, export_html
+from .exporter import export_json_v2, export_csv_v2, export_html_v2
 from .safety import get_risk_level, RiskLevel
 from .i18n import I18n
 from .utils import format_size, get_default_drive
+from .engine.models import ScanResult
 
 
 class _UserExit(Exception):
@@ -58,7 +59,7 @@ def choose_path(i18n: I18n, console: Console) -> str:
     return path
 
 
-def do_scan(path: str, i18n: I18n, console: Console) -> FolderInfo:
+def do_scan(path: str, i18n: I18n, console: Console) -> tuple[FolderInfo, ScanResult]:
     scanner = Scanner(max_workers=16)
 
     with Progress(
@@ -78,7 +79,7 @@ def do_scan(path: str, i18n: I18n, console: Console) -> FolderInfo:
 
     console.print(f"[green]{i18n.t('files_scanned', count=f'{scanner.scanned_files:,}')}[/green]")
     console.print(f"[green]{i18n.t('folders_scanned', count=f'{scanner.scanned_folders:,}')}[/green]")
-    return result
+    return result, scanner.scan_result()
 
 
 def get_top_folders(root: FolderInfo) -> list[FolderInfo]:
@@ -179,7 +180,7 @@ def action_delete(root: FolderInfo, top_folders: list[FolderInfo], i18n: I18n, c
     console.print(f"\n[green]{i18n.t('deleted_count', count=deleted)}[/green]")
 
 
-def action_export(root: FolderInfo, i18n: I18n, console: Console):
+def action_export(root: FolderInfo, scan_result: ScanResult, i18n: I18n, console: Console):
     console.print(i18n.t("export_title"))
     console.print(f"  {i18n.t('export_json')}")
     console.print(f"  {i18n.t('export_csv')}")
@@ -188,13 +189,17 @@ def action_export(root: FolderInfo, i18n: I18n, console: Console):
     choice = ask_text(i18n.t("export_prompt"), choices=["1", "2", "3"])
     filename = ask_text(i18n.t("export_filename"), default="report")
 
-    ext_map = {"1": (".json", export_json), "2": (".csv", export_csv), "3": (".html", export_html)}
+    ext_map = {
+        "1": (".json", export_json_v2),
+        "2": (".csv", export_csv_v2),
+        "3": (".html", export_html_v2),
+    }
     ext, exporter_fn = ext_map[choice]
 
     output_path = os.path.join(os.getcwd(), f"{filename}{ext}")
 
     try:
-        exporter_fn(root, i18n, output_path)
+        exporter_fn(root, i18n, output_path, scan_result)
         console.print(f"[green]{i18n.t('export_success', path=output_path)}[/green]")
     except Exception as e:
         console.print(f"[red]{i18n.t('export_failed', error=str(e))}[/red]")
@@ -229,7 +234,7 @@ def main():
 
         path = args.path if args.path else choose_path(i18n, console)
 
-        root = do_scan(path, i18n, console)
+        root, scan_result = do_scan(path, i18n, console)
         top_folders = get_top_folders(root)
 
         while True:
@@ -241,7 +246,7 @@ def main():
                 action_delete(root, top_folders, i18n, console)
                 top_folders = get_top_folders(root)
             elif choice == "3":
-                action_export(root, i18n, console)
+                action_export(root, scan_result, i18n, console)
             elif choice == "4":
                 console.print(f"[cyan]{i18n.t('goodbye')}[/cyan]")
                 break

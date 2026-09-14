@@ -20,7 +20,7 @@ from folder_analyzer.security_guard import (
     validate_delete_target,
     revalidate,
 )
-from folder_analyzer.exporter import export_json, export_csv, export_html
+from folder_analyzer.exporter import export_json_v2, export_csv_v2, export_html_v2
 from folder_analyzer.i18n import I18n
 
 from .models import (
@@ -76,6 +76,7 @@ def scan_folder(req: ScanRequest, request: Request):
     scanner = Scanner(max_workers=16)
     root = scanner.scan(path)
     request.app.state.last_scan_root = root
+    request.app.state.last_scan_result = scanner.scan_result()
 
     root_dict = _folder_to_dict(root)
     # The scanned root is never a normal deletable item.
@@ -182,14 +183,17 @@ def delete_folders(req: DeleteRequest, request: Request):
 @router.post("/api/export")
 def export_report(req: ExportRequest, request: Request):
     root = _get_last_scan_root(request)
+    scan_result = getattr(request.app.state, "last_scan_result", None)
+    if scan_result is None:
+        raise HTTPException(status_code=400, detail="No scan analysis available. POST /api/scan first.")
 
     lang = req.lang if req.lang in ("en", "es") else "en"
     i18n = I18n(lang)
 
     ext_map = {
-        "json": (".json", export_json),
-        "csv": (".csv", export_csv),
-        "html": (".html", export_html),
+        "json": (".json", export_json_v2),
+        "csv": (".csv", export_csv_v2),
+        "html": (".html", export_html_v2),
     }
 
     if req.format not in ext_map:
@@ -201,7 +205,7 @@ def export_report(req: ExportRequest, request: Request):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         output_path = os.path.join(tmpdir, f"report{ext}")
-        exporter_fn(root, i18n, output_path)
+        exporter_fn(root, i18n, output_path, scan_result)
 
         with open(output_path, "r", encoding="utf-8") as f:
             content = f.read()
