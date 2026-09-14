@@ -254,23 +254,40 @@ folder-analyzer --path C:\
     `action_export` uses the v2 functions. API stores `app.state.last_scan_result`
     at scan time; `/api/export` uses the v2 exporters and returns 400 when the
     scan analysis is missing (test added). i18n: 7 new header keys (EN+ES).
-  - Composition note (honest): per-folder `composition`/`assessment` reflect the
-    folder's **direct** analyzed bytes (descendants carry their own nodes) — same
-    semantics as the Phase-5 `ScanResult` (`total_bytes` is a folder's direct
-    scanned set).
-- **Suite:** 315 → **329 passed, 2 skipped** (+14, all in `tests/test_export_v2.py`
-  + 3 in `tests/test_api.py`; `test_i18n.py` extended).
-- **Benchmark (uninstrumented headline, pinned P-cores [`0,1`/`10,11`/`1,8`],
-  50k fixture):** scan-side delta of the v2 path = `t_fold`(`scan_result`)
-  **0.47–0.50 ms = +0.06–0.12%** vs t_scan 0.42 s. **Export generation (its own
-  honest number): JSON 2.3–2.5 ms, CSV 0.9 ms, HTML 0.8–1.1 ms, total 4.0–4.4
-  ms**; output bytes 59,731 / 7,509 / 30,081 (identical across runs). Gate
-  (tracemalloc, deterministic): fold+export alloc-peak **0.23 MiB**, retained
+  - Composition note (corrected during verification): per-folder
+    `composition` is the **full recursive aggregation** — the folder's own
+    direct analyzed bytes plus every descendant's — folded from the captured
+    `FolderAggregation.composition` values at export time. Pure data
+    arithmetic on scan-time data (no engine/classifier access);
+    `root_composition.total_bytes == total_size == total_descendant_size`.
+    `assessment` remains the engine's folder-level short-circuit verdict over
+    the direct set (unchanged, I10-safe).
+- **Suite:** 315 → **334 passed, 2 skipped** (+19: `tests/test_export_v2.py`
+  +5 verification-point tests — recursive composition across levels,
+  reason_key localization through actual CSV/HTML rows (EN+ES), item-demotion
+  key set, producible-key audit; the zero-reclassification test now instruments
+  the `scan_result()` fold — +3 in `tests/test_api.py`; `test_i18n.py`
+  extended; `test_explain.py` + `uncertain`).
+- **Benchmark (uninstrumented headline, pinned P-cores [`0,1`], 50k fixture):**
+  scan-side delta of the v2 path = `t_fold`(`scan_result`) **0.494 ms =
+  +0.11%** vs t_scan 0.470 s. **Export generation (its own honest number, after
+  the recursive-composition fold): JSON 2.6 ms, CSV 0.9 ms, HTML 0.8 ms, total
+  4.3 ms**; output bytes 59,862 / 7,509 / 30,081 (identical across runs). Gate
+  (tracemalloc, deterministic): fold+export alloc-peak **0.26 MiB**, retained
   records 7,400 @ +0%. Runs:
   `benchmarks/results/phase6-export-r{1..3}.json` (gitignored).
 - **Docs:** `docs/ROADMAP.md` (Phase 6 → COMPLETE, status header, §24 risk item 9
   context), `docs/ARCHITECTURE.md` (module map + §6 Phase-6 row),
   `CHANGELOG.md` [Unreleased].
+- **Verification (reviewer, 2026-09-14):** point 1 confirmed + fixed —
+  composition now the full recursive aggregation (multi-level test
+  `test_composition_recursive_across_levels` proves
+  `root_composition.total_bytes == total_size` and descendant-level
+  `by_category`); point 2 emitted — `scan_result()` quoted and its fold now
+  executed UNDER the 8-KB/classifier patchers with 0 calls (it is a pure in-memory
+  fold, no classifier/KB); point 3 covered — `uncertain` registered EN/ES + every
+  registered key proven localized through ACTUAL CSV/HTML rows in EN+ES +
+  producible-key audit (no raw key can reach a reason cell).
 - **Next:** awaits formal Phase 6 acceptance (`"Phase 6 approved, proceed to
   Phase 7"`). Phase 7 — Web UI + single-source i18n migration (`locales/*.json`),
   no further classification/composition changes (per approved scope).

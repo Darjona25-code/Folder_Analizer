@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   at scan time — **zero** knowledge-base/classifier access during export
   (guardrail test). Enriched per-folder data: `analysis_state`, `files_analyzed`,
   `records_retained`, `assessment`, `composition`.
+- **Composition semantics (verification point):** every node's `composition` is
+  the full RECURSIVE aggregation (own direct bytes + every descendant's, folded
+  from the scan-time `FolderComposition` values at export time); pure data fold,
+  no engine access. `root_composition.total_bytes == total_size`. `assessment`
+  unchanged (folder-level short-circuit over the direct set).
 - **JSON v2 schema** (`schema_version=2`): top-level scan metrics
   (`scan_date`, `root_path`, `total_size`, `total_files`, `total_folders`,
   `files_analyzed`, `records_retained`, `inaccessible_count`, `folder_errors`),
@@ -35,20 +40,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **i18n:** 7 new EN/ES header keys (`col_recommendation`, `col_confidence`,
   `col_impact`, `col_reason`, `col_analysis_state`, `col_files_analyzed`,
   `col_records_retained`).
+- **Explainability:** register `uncertain` (I3 item-level demotion key from
+  `models.py Assessment.__post_init__`) EN+ES, closing a latent raw-key leak
+  in `explain.resolve_reason`.
 - **Tests** (`tests/test_export_v2.py`): schema + enrichment, canonical ordering,
   files-analyzed full coverage, localized ES CSV/HTML, byte-identical
   determinism (all 3 formats), zero-reclassification guardrail (module-reference
-  inspection + 8 wrapped KB/classifier entry points), v1 preservation. API tests:
+  inspection + 8 wrapped KB/classifier entry points; the `scan_result()` fold is
+  now executed UNDER the patchers with 0 calls), recursive composition across
+  levels, reason-key localization through ACTUAL CSV/HTML rows (EN+ES),
+  item-demotion key audit, producible-key audit, v1 preservation. API tests:
   missing-analysis 400, JSON v2 schema on `/api/export`, `last_scan_result`
-  stored. i18n test extended. Suite grew **315 → 329 passed, 2 skipped**.
+  stored. i18n test extended; `test_explain.py` `KNOWN_KEYS` + `uncertain`.
+  Suite grew **315 → 334 passed, 2 skipped** (+19).
 - **Benchmark (uninstrumented headline, pinned P-cores, 50k fixture):** scan-side
-  delta of the v2 path = `t_fold(scan_result)` 0.47–0.50 ms =
-  **+0.06–0.12%**. Export generation (own honest number): JSON 2.3–2.5 ms, CSV
-  0.9 ms, HTML 0.8–1.1 ms, total 4.0–4.4 ms; 59,731 / 7,509 / 30,081 B output
-  (identical across runs). Gate alloc-peak fold+export **0.23 MiB**, retained
-  7,400 @ +0%. Runs `benchmarks/results/phase6-export-r{1..3}.json`
-  (gitignored). New harness `benchmarks/run_export.py` reuses the pinned
-  affinity methodology.
+  delta of the v2 path = `t_fold(scan_result)` **0.494 ms = +0.11%** (n=1,
+  pinned P-cores [0,1]). Export generation (own honest number, after the
+  recursive-composition fold): JSON 2.6 ms, CSV 0.9 ms, HTML 0.8 ms, total
+  4.3 ms; 59,862 / 7,509 / 30,081 B output (identical across runs). Gate
+  alloc-peak fold+export **0.26 MiB**, retained 7,400 @ +0%. Runs
+  `benchmarks/results/phase6-export-r{1..3}.json` (gitignored). New harness
+  `benchmarks/run_export.py` reuses the pinned affinity methodology.
 - **Docs:** `docs/ARCHITECTURE.md` (module map → Phase 6, §6 Phase-6 benchmark
   row), `docs/ROADMAP.md` (Phase 6 → COMPLETE, status header), `SESSION.md`.
 

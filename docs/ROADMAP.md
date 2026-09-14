@@ -1,6 +1,6 @@
 # Folder Analyzer — Master Roadmap v3.0
 
-Status: **APPROVED — Phases 1–6 complete (Phase 6: Exports v2 — schema v2 JSON/CSV/HTML, deterministic byte-identical exports, zero-reclassification guardrail; submitted, pending formal acceptance). Phase 7 (Web UI + i18n migration) next.**
+Status: **APPROVED — Phases 1–6 complete. Phase 6 (Exports v2) verification closed: recursive-composition fix landed (composition = full recursive aggregation), reason localization + `scan_result()`-fold guardrail covered (suite 334 passed / 2 skipped). Pending formal acceptance before Phase 7 (Web UI + i18n migration).**
 Version of this document: Phase 1 baseline commit.
 
 This is the implementation contract for the project. It is the single, internally
@@ -560,8 +560,10 @@ Fixed process (re-affirmed):
     `docs/ARCHITECTURE.md` §6a). Suite 313 passed / 2 skipped.
 
 ### Phase 6 — Exports v2
-- **Status:** COMPLETE (commits `4b4b7a9` / `85f8fa8` / `63f8cd7`; submitted for
-  formal acceptance, which authorizes Phase 7).
+- **Status:** COMPLETE — verification point 1 (composition field semantics) fixed;
+  points 2+3 confirmed and covered. Commits `4b4b7a9` / `85f8fa8` / `63f8cd7`
+  + composition fix commit. Submitted for formal acceptance, which authorizes
+  Phase 7.
 - **Objective:** export schema v2 (assessment fields + `analysis_state` markers); CSV/HTML/JSON deterministic.
 - **Why:** offline consumption; stable documented schema.
 - **Dependencies:** Phase 5.
@@ -569,23 +571,30 @@ Fixed process (re-affirmed):
 - **Scope:** schema bump; `schema_version=2`; HTML assessment columns + localized keys; JSON round-trip.
 - **Delivered:** v2 exporters in `folder_analyzer/exporter.py` backed **only** by
   the collected ScanResult (zero classifier/KB calls during export — guardrail
-  tested); JSON v2 (top-level metrics + `root_assessment`/`root_composition` +
-  enriched tree, canonical ordering); CSV/HTML v2 (Rec/Conf/Impact + localized
-  Reason + Analysis State/Files Analyzed/Records Retained; top-500 sorted
+  tested); **composition is the full recursive aggregation** (`root_composition.total_bytes
+  == total_size`, fold is pure data on scan-time `FolderComposition` values — no
+  engine access); `assessment` unchanged (engine folder short-circuit); JSON v2
+  (top-level metrics + `root_assessment`/`root_composition` + enriched tree,
+  canonical ordering); CSV/HTML v2 (Rec/Conf/Impact + localized Reason +
+  Analysis State/Files Analyzed/Records Retained; top-500 sorted
   size-desc-then-path-asc, root excluded); injectable `scan_date` + canonical
   sort ⇒ byte-identical exports (SHA-256 hash-compare test, all 3 formats);
   CLI `do_scan` → `(FolderInfo, ScanResult)`; API stores `last_scan_result` and
-  exports v2 (400 when analysis missing); 7 new EN/ES i18n keys; v1 `export_*`
-  preserved (v2 replaces v1 at CLI/API call sites — stated decision).
-- **Tests:** field presence; deterministic (byte-identical); round-trip;
-  zero-reclassification guardrail; localization; v1 preservation. **Suite 315 →
-  329 passed, 2 skipped.**
+  exports v2 (400 when analysis missing); 7 new EN/ES i18n keys;
+  `uncertain` (I3 demotion key) registered EN+ES; v1 `export_*` preserved (v2
+  replaces v1 at CLI/API call sites — stated decision).
+- **Tests:** field presence; recursive composition across levels; deterministic
+  (byte-identical); round-trip; zero-reclassification guardrail (now
+  instruments the `scan_result()` fold with 0 calls); reason-key localization
+  through actual CSV/HTML rows (EN+ES); item-demotion and producible-key audit;
+  localization; v1 preservation. **Suite 315 → 334 passed, 2 skipped.**
 - **Manual validation:** export all 3 formats from real scan.
 - **Documentation:** README example; CHANGELOG.
 - **Git strategy:** `feat(export): schema v2 with safety assessments (Phase 6)`.
-- **Benchmark:** scan-side delta = `scan_result` fold 0.47–0.50 ms = +0.06–0.12%;
-  export generation total 4.0–4.4 ms (JSON 2.3–2.5 / CSV 0.9 / HTML 0.8–1.1);
-  gate alloc-peak fold+export 0.23 MiB; retained 7,400 @ +0%.
+- **Benchmark:** scan-side delta = `scan_result` fold 0.494 ms = +0.11%
+  (pinned P-cores [0,1], n=1); export generation total 4.3 ms
+  (JSON 2.6 / CSV 0.9 / HTML 0.8); gate alloc-peak fold+export 0.26 MiB;
+  retained 7,400 @ +0%.
 - **Acceptance criteria:** all fields; no CLI-export regression. **Met.**
 - **Risks:** low.
 - **Estimated effort:** 4–7 h. **Uncertainty:** Low.

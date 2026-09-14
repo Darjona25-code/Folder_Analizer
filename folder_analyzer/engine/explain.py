@@ -25,6 +25,10 @@ REASONS: Dict[str, Dict[str, str]] = {
             "Classification confidence is low; verification is required."
         ),
         "user_data": "Contains personal or user-generated data.",
+        "uncertain": (
+            "Impact could not be resolved with high confidence; safe deletion "
+            "cannot be justified, so this item is kept for review."
+        ),
         "temporary_data": "Recognized transient/temporary data.",
         "clean_system_data": (
             "Low system/user impact with no protected or user-value content "
@@ -100,6 +104,11 @@ REASONS: Dict[str, Dict[str, str]] = {
             "La confianza de la clasificacion es baja; se requiere verificacion."
         ),
         "user_data": "Contiene datos personales o generados por el usuario.",
+        "uncertain": (
+            "No se pudo resolver el impacto con confianza alta; no se puede "
+            "justificar una eliminacion segura, por lo que este elemento se "
+            "conserva para revision."
+        ),
         "temporary_data": "Datos transitorios/temporales reconocidos.",
         "clean_system_data": (
             "Impacto bajo de sistema/usuario sin contenido protegido ni valioso "

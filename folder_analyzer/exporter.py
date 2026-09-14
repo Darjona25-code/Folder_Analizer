@@ -18,7 +18,7 @@ from .scanner import FolderInfo, sort_folders_by_size
 from .safety import get_risk_level, get_risk_label
 from .utils import format_size
 from .i18n import I18n
-from .engine.models import Assessment, FolderComposition, ScanResult
+from .engine.models import Assessment, ScanResult
 from .engine.explain import resolve_reason
 
 
@@ -146,10 +146,17 @@ def export_html(root: FolderInfo, i18n: I18n, output_path: str):
 # Phase 6 — v2 exporters (enriched, annotation-backed, deterministic).
 #
 # These functions read ONLY the values captured during the scan: the FolderInfo
-# tree, the ScanResult perf-folder aggregation and its Assessments. They never
+# tree, the ScanResult per-folder aggregation and its Assessments. They never
 # invoke the knowledge base, classifier, or scanner. Determinism: scan_date is
 # injectable, children/rows are canonically sorted, and all dict/field ordering
 # is construction-stable, so identical inputs yield byte-identical files.
+#
+# A node's ``composition`` is its FULL RECURSIVE composition: the node's own
+# direct analyzed bytes plus the recursive composition of every descendant,
+# folded from the already-captured FolderComposition values. A node's
+# ``composition.total_bytes`` therefore equals its FolderAggregation
+# ``total_descendant_size`` (ALL files below, retained or not). The fold is
+# pure data arithmetic on captured values — no engine/classifier runs here.
 # ---------------------------------------------------------------------------
 
 _V2_SCHEMA_VERSION = 2
@@ -171,38 +178,72 @@ def _assessment_to_dict(assessment: Optional[Assessment]) -> Optional[dict]:
     }
 
 
-def _composition_to_dict(composition: Optional[FolderComposition]) -> Optional[dict]:
-    if composition is None:
-        return None
-    return {
-        "total_bytes": composition.total_bytes,
-        "disposable_bytes": composition.disposable_bytes,
-        "user_value_bytes": composition.user_value_bytes,
-        "protected_critical_bytes": composition.protected_critical_bytes,
-        "known_non_disposable_bytes": composition.known_non_disposable_bytes,
-        "unknown_bytes": composition.unknown_bytes,
-        "not_resolvable_count": composition.not_resolvable_count,
-        "by_category": {
-            category: composition.by_category[category]
-            for category in sorted(composition.by_category)
-        },
-    }
+def _build_recursive_compositions(node: FolderInfo, per_folder: dict) -> dict:
+    """Post-order fold of every node's FULL-tree composition (its own direct
+    analyzed bytes plus every descendant's, recursively), computed exclusively
+    from the FolderComposition values captured at scan time.
+
+    ``root``'s entry therefore covers the whole scanned tree
+    (``FolderAggregation.total_descendant_size`` semantics — ALL files below,
+    retained or not): ``root_comp["total_bytes"] == root.total_size``.
+
+    Deterministic: ``by_category`` is key-sorted at every node, so identical
+    scan data always folds to byte-identical output.
+    """
+    comps: dict = {}
+
+    def _visit(n: FolderInfo) -> None:
+        agg = per_folder.get(os.path.normpath(n.path))
+        own = agg.composition if agg is not None else None
+        comp = {
+            "total_bytes": own.total_bytes if own is not None else 0,
+            "disposable_bytes": own.disposable_bytes if own is not None else 0,
+            "user_value_bytes": own.user_value_bytes if own is not None else 0,
+            "protected_critical_bytes": own.protected_critical_bytes if own is not None else 0,
+            "known_non_disposable_bytes": own.known_non_disposable_bytes if own is not None else 0,
+            "unknown_bytes": own.unknown_bytes if own is not None else 0,
+            "not_resolvable_count": own.not_resolvable_count if own is not None else 0,
+            "by_category": dict(own.by_category) if own is not None else {},
+        }
+        for child in n.children:
+            _visit(child)
+            child_comp = comps[os.path.normpath(child.path)]
+            comp["total_bytes"] += child_comp["total_bytes"]
+            comp["disposable_bytes"] += child_comp["disposable_bytes"]
+            comp["user_value_bytes"] += child_comp["user_value_bytes"]
+            comp["protected_critical_bytes"] += child_comp["protected_critical_bytes"]
+            comp["known_non_disposable_bytes"] += child_comp["known_non_disposable_bytes"]
+            comp["unknown_bytes"] += child_comp["unknown_bytes"]
+            comp["not_resolvable_count"] += child_comp["not_resolvable_count"]
+            for category, size in child_comp["by_category"].items():
+                comp["by_category"][category] = (
+                    comp["by_category"].get(category, 0) + size
+                )
+        comp["by_category"] = {
+            category: comp["by_category"][category]
+            for category in sorted(comp["by_category"])
+        }
+        comps[os.path.normpath(n.path)] = comp
+
+    _visit(node)
+    return comps
 
 
-def _enrich_node(node: FolderInfo, per_folder: dict) -> dict:
+def _enrich_node(node: FolderInfo, per_folder: dict, comps: dict) -> dict:
     """Deep-copy a FolderInfo node into the v2 tree shape, enriched with the
     per-folder aggregation captured at scan time. Children are ordered
     canonically by normalized path so identical scan data serializes
-    byte-identically regardless of filesystem enumeration order."""
+    byte-identically regardless of filesystem enumeration order. ``comps`` is
+    the recursive-composition map from ``_build_recursive_compositions``."""
     agg = per_folder.get(os.path.normpath(node.path))
     base = node.to_dict()
     base["analysis_state"] = "analyzed"
     base["files_analyzed"] = agg.files_analyzed if agg is not None else 0
     base["records_retained"] = agg.records_retained if agg is not None else 0
     base["assessment"] = _assessment_to_dict(agg.assessment if agg is not None else None)
-    base["composition"] = _composition_to_dict(agg.composition if agg is not None else None)
+    base["composition"] = comps[os.path.normpath(node.path)]
     base["children"] = [
-        _enrich_node(child, per_folder)
+        _enrich_node(child, per_folder, comps)
         for child in sorted(node.children, key=lambda c: os.path.normpath(c.path))
     ]
     return base
@@ -231,10 +272,9 @@ def export_json_v2(
     data["root_assessment"] = _assessment_to_dict(
         root_agg.assessment if root_agg is not None else None
     )
-    data["root_composition"] = _composition_to_dict(
-        root_agg.composition if root_agg is not None else None
-    )
-    data["tree"] = _enrich_node(root, scan_result.per_folder)
+    comps = _build_recursive_compositions(root, scan_result.per_folder)
+    data["root_composition"] = comps[os.path.normpath(root.path)]
+    data["tree"] = _enrich_node(root, scan_result.per_folder, comps)
 
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)

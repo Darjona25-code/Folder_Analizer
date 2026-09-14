@@ -9,6 +9,7 @@ KNOWN_KEYS = [
     "confidence_gate_promoted",
     "confidence_low",
     "user_data",
+    "uncertain",
     "temporary_data",
     "clean_system_data",
     "review_before_delete",
