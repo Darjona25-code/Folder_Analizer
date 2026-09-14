@@ -70,6 +70,8 @@ def test_all_keys_exist_en():
         "delete_root_blocked", "delete_warning_program", "deleted_count",
         "col_subfolders", "col_distribution", "files_count", "folders_count",
         "export_csv_size_bytes", "export_csv_size_human",
+        "col_recommendation", "col_confidence", "col_impact", "col_reason",
+        "col_analysis_state", "col_files_analyzed", "col_records_retained",
     ]
     for key in keys:
         result = i18n.t(key)
@@ -86,6 +88,8 @@ def test_all_keys_exist_es():
         "delete_root_blocked", "delete_warning_program", "deleted_count",
         "col_subfolders", "col_distribution", "files_count", "folders_count",
         "export_csv_size_bytes", "export_csv_size_human",
+        "col_recommendation", "col_confidence", "col_impact", "col_reason",
+        "col_analysis_state", "col_files_analyzed", "col_records_retained",
     ]
     for key in keys:
         result = i18n.t(key)

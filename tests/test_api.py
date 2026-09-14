@@ -104,8 +104,31 @@ def test_delete_multiple_mixed(tmp_dir):
 
 def test_export_no_scan():
     app.state.last_scan_root = None
+    app.state.last_scan_result = None
     response = client.post("/api/export", json={"format": "json"})
     assert response.status_code == 400
+
+
+def test_export_no_analysis_returns_400(tmp_dir):
+    client.post("/api/scan", json={"path": tmp_dir})
+    app.state.last_scan_result = None
+    response = client.post("/api/export", json={"format": "json"})
+    assert response.status_code == 400
+
+
+def test_export_json_v2_schema(tmp_dir):
+    client.post("/api/scan", json={"path": tmp_dir})
+    response = client.post("/api/export", json={"format": "json"})
+    assert response.status_code == 200
+    assert response.json()["schema_version"] == 2
+    assert response.json()["root_assessment"] is not None
+    assert response.json()["tree"]["assessment"] is not None
+
+
+def test_scan_stores_scan_result(tmp_dir):
+    client.post("/api/scan", json={"path": tmp_dir})
+    assert app.state.last_scan_result is not None
+    assert app.state.last_scan_result.root_path == os.path.normpath(tmp_dir)
 
 
 def test_export_json(tmp_dir):
@@ -204,6 +227,7 @@ def test_child_can_be_deleted_after_scan(tmp_dir):
 def test_state_reset_after_restart_reports_no_scan(tmp_dir):
     client.post("/api/scan", json={"path": tmp_dir})
     app.state.last_scan_root = None
+    app.state.last_scan_result = None
     assert client.get("/api/stats").status_code == 400
     assert client.get("/api/folders").status_code == 400
     assert client.post("/api/export", json={"format": "json"}).status_code == 400
