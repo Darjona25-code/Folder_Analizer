@@ -56,6 +56,13 @@ locations) that forbids deletion regardless of containment. In Phase 1 this is t
 existing critical/app protected path logic (see `folder_analyzer/safety.py` and
 `is_protected_path`).
 
+> Note (2026-09-14): `safety.py` rates `C:\Users` **CAUTION** (and `C:\Windows`/
+> `Program Files`/`ProgramData` CRITICAL). CAUTION is a guard-layer risk color for
+> the legacy risk badge — it is NOT a Phase-5 composition verdict and never feeds
+> `derive_folder_recommendation`. A CAUTION color does not imply the advisory model
+> recommends DO_NOT_DELETE: `C:\Users` (user-profile mix) is REVIEW_FIRST/MEDIUM
+> (ROADMAP §11 ex7; §24 risk item 9), with per-item review authority preserved (I10).
+
 ### 2.3 Deletion authorization
 
 User consent. The UI enables destructive action only for SAFE_TO_DELETE items; the CLI

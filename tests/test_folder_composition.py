@@ -1,18 +1,18 @@
 """Folder composition tests (Phase 5): compose() aggregation + invariants,
-and the seven canonical roadmap §11 composition examples end-to-end
+and the eight canonical roadmap §11 composition examples end-to-end
 (classification -> compose -> derive_folder_recommendation).
 
-Canonical examples are numbered as in docs/ROADMAP.md §11:
-1, 2, 3, 4, 5, 6, 8. (Example 7 `C:\\Users` is a protected-policy case driven
-by I6/I7, not composition-deterministic, so it is asserted via the R1 hard
-rule in test_recommender.py rather than here.)
+Canonical examples are numbered as in docs/ROADMAP.md §11: 1, 2, 3, 4, 5, 6, 7, 8.
+Example 7 (`C:\\Users`, user-profile mix) is composition-deterministic via R2
+(USER_VALUE heavy) - REVIEW_FIRST/MEDIUM, matching the approved source; it is NOT
+a Tier-0/protected-critical folder (ROADMAP §24 risk item 9).
 """
 
 import os
 
 import pytest
 
-from folder_analyzer.engine.classifier import classify_path
+from folder_analyzer.engine.classifier import bucket_for_category, classify_path
 from folder_analyzer.engine.enums import (
     CompositionBucket,
     ConfidenceLevel,
@@ -132,7 +132,7 @@ def test_compose_not_resolvable_aggregates_unknown_bucket():
 
 
 # ---------------------------------------------------------------------------
-# Canonical roadmap examples (7 of them; ex7 is I6-policy territory).
+# Canonical roadmap examples (8 of them; ex7 is R2-driven user mix).
 # ---------------------------------------------------------------------------
 
 CANONICALS = [
@@ -196,6 +196,19 @@ CANONICALS = [
         [
             _classified("C:\\fake\\docs\\report.docx", 100),
             _classified("C:\\fake\\config\\settings.json", 100),
+        ],
+        SystemImpact.NONE,
+        DeletionRecommendation.REVIEW_FIRST,
+        ConfidenceLevel.MEDIUM,
+        "r2_user_value",
+    ),
+    (
+        "ex7_users_mix",
+        [
+            _classified("C:\\fake\\docs\\report.docx", 600),
+            _classified("C:\\fake\\config\\settings.json", 300),
+            _classified("C:\\fake\\mystery.qux", 50),
+            _classified("C:\\fake\\cache\\cache_a.bin", 50),
         ],
         SystemImpact.NONE,
         DeletionRecommendation.REVIEW_FIRST,
@@ -327,3 +340,63 @@ def test_canonical_folder_assessments_resolve_in_both_locales():
                                   params=folder.reason_params)
             assert text != folder.reason_key
             assert text.strip()
+
+
+def test_tier1_known_folders_never_miswired_to_r1(monkeypatch):
+    """Machine-pinned Tier-1 boundary (ROADMAP §10/§11; §24 risk item 9).
+
+    The six advisory Tier-1 known locations resolve to USER_VALUE or
+    KNOWN_NON_DISPOSABLE — never PROTECTED_CRITICAL, so a folder composed of
+    them can never fire the R1 DO_NOT_DELETE short-circuit. PROGRAMDATA
+    (`program_data`) is the ONE intentional protected Tier-1 member (system
+    program data, I6-critical): assert BOTH sides so any future re-wire is
+    caught.
+    """
+    import folder_analyzer.engine.kb.env_paths as env_paths
+
+    monkeypatch.setenv("USERPROFILE", "C:\\fake\\home")
+    monkeypatch.setenv("LOCALAPPDATA", "C:\\fake\\localappdata")
+    monkeypatch.setenv("APPDATA", "C:\\fake\\roamingappdata")
+    monkeypatch.setenv("PROGRAMDATA", "C:\\fake\\programdata")
+    monkeypatch.setenv("TEMP", "C:\\fake\\temp")
+    monkeypatch.setenv("TMP", "C:\\fake\\temp")
+
+    orig_lookup = env_paths._known_folder_path
+
+    def fake_known_folder(key):
+        return "C:\\fake\\known\\" + key
+
+    env_paths._known_folder_path = fake_known_folder
+    try:
+        reset_session_caches()
+        advisory = {
+            "C:\\fake\\known\\downloads\\setup.zip": "downloads",
+            "C:\\fake\\known\\documents\\report.docx": "documents",
+            "C:\\fake\\known\\desktop\\notes.txt": "desktop",
+            "C:\\fake\\home\\mixed.txt": "user_profile",
+            "C:\\fake\\localappdata\\App\\f.bin": "app_data_local",
+            "C:\\fake\\roamingappdata\\App\\f.bin": "app_data_roaming",
+        }
+        for path, expected in advisory.items():
+            assert bucket_for_category(expected, path) \
+                is not CompositionBucket.PROTECTED_CRITICAL, path
+            item = classify_path(path)
+            assert item.recommendation is not \
+                DeletionRecommendation.DO_NOT_DELETE, path
+            folder = derive_folder_recommendation(
+                None, compose([_classified(path, 1)]))
+            assert folder.recommendation is not \
+                DeletionRecommendation.DO_NOT_DELETE, path
+
+        pdata = "C:\\fake\\programdata\\App\\f.bin"
+        pdata_item = classify_path(pdata)
+        assert pdata_item.detected_category == "program_data"
+        assert pdata_item.recommendation is DeletionRecommendation.DO_NOT_DELETE
+        assert bucket_for_category(pdata_item.detected_category, pdata) \
+            is CompositionBucket.PROTECTED_CRITICAL
+        pdata_folder = derive_folder_recommendation(
+            None, compose([_classified(pdata, 1)]))
+        assert pdata_folder.recommendation is DeletionRecommendation.DO_NOT_DELETE
+    finally:
+        env_paths._known_folder_path = orig_lookup
+        reset_session_caches()

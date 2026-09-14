@@ -297,7 +297,7 @@ deletion trustworthiness over maximizing the number of SAFE_TO_DELETE results.
 | 4 | 95% disposable + 5% UNKNOWN | LOW | REVIEW_FIRST | MEDIUM | R3 strict: any UNKNOWN blocks; majority-safe insufficient |
 | 5 | 60% cache + 40% UNKNOWN | UNKNOWN | REVIEW_FIRST | LOW | Large unknown; cannot assess |
 | 6 | Personal docs + app data | NONE | REVIEW_FIRST | MEDIUM | R2; user consent required |
-| 7 | `C:\Users` | HIGH | DO_NOT_DELETE | HIGH | Protected; profiles + app data |
+| 7 | `C:\Users` (user-profile mix) | NONE | REVIEW_FIRST | MEDIUM | R2; ~5% UNKNOWN; not Tier 0 |
 | 8 | `Downloads` | LOW | REVIEW_FIRST | HIGH | Policy; per-file assessments vary |
 
 Ex6 confidence footnote: MEDIUM is the approved-source value (reverted 2026-09-13). The
@@ -306,6 +306,13 @@ folder-level REVIEW_FIRST confidence does NOT track unknown-byte share — it re
 certainty of ONE aggregate verdict over a heterogeneous composition (Ex6 spans docs +
 config + temp). Folder-level HIGH is reserved for near-homogeneous or single-policy
 verdicts (Ex1/Ex2/Ex8/R1). See §24 risk item 8.
+
+Row 7 footnote (corrected 2026-09-14): `C:\Users` is a user-profile mix —
+R2-derived REVIEW_FIRST/MEDIUM, matching the approved source. It is NOT a Tier-0
+critical root (`kb.classify("C:\Users")` → `unknown`; only `C:\Users\<profile>`
+resolves Tier 1 `user_profile`, USER_VALUE bucket). The legacy `safety.py` CAUTION
+rating is a guard-layer risk color, not a composition verdict; per-item review
+authority (I10) is preserved. See §24 risk item 9.
 
 Examples 4: the 5% UNKNOWN drives the ceiling via R3 (`UNKNOWN_BLOCK = 0.0`). Constraint
 example (documented): 100 GB folder with 95 GB cache + 5 GB personal documents ⇒
@@ -709,6 +716,22 @@ Fixed process (re-affirmed):
    with Ex6/Ex7. The Downloads-policy floor stays HIGH (Ex8). R1 (protected-critical) and
    R5 (SAFE) remain HIGH. Item-level classification confidence is unaffected (§2).
    This reversion supersedes the interim HIGH-correction rationale in `d6ba116`.
+9. **Example 7 recommendation — CORRECTED from DO_NOT_DELETE/HIGH to the source's
+   REVIEW_FIRST/MEDIUM (2026-09-14).** The §11 row previously read `C:\Users → HIGH /
+   DO_NOT_DELETE / HIGH — "Protected; profiles + app data"`, a composition hard block
+   that (a) contradicts the approved source (`C:\Users\David`: every area REVIEW_FIRST;
+   `protected_pct ≈ 0`, `unknown_pct ≈ 0.05`; Derived: REVIEW_FIRST, MEDIUM) and (b) has
+   NO live code path — `kb.classify("C:\Users")` returns `unknown` (Tier-0 `_EXACT`/
+   `_TREE` contain no profile root; Tier 1 matches only `C:\Users\<profile>` →
+   `user_profile`, USER_VALUE bucket); folder-level derive emits REVIEW_FIRST via R2
+   (`r2_user_value`) or the empty-tree branch (`r6_review_first`), both MEDIUM. No
+   R1/DO_NOT_DELETE path exists. The one intentional protected Tier-1 member is
+   PROGRAMDATA (`program_data` → PROTECTED_CRITICAL), pinned by test. The word
+   "Protected" traces to the legacy `safety.py` `CAUTION_FOLDERS` guard color — never
+   an input to `derive_folder_recommendation`. This is the SECOND source-vs-doc drift
+   found (Ex6 HIGH, then Ex7 DO_NOT_DELETE); both were documentation-only, never live
+   code. Row 7 + recommender docstring corrected; canonical ex7 composition test and a
+   Tier-1 known-folder boundary test added; no classification code changed.
 
 ## 25. Total ETA (single authoritative figure)
 

@@ -22,8 +22,8 @@ The research aligns exactly with roadmap §11 canonical examples:
 | 3      | mixed disposable + critical      | HIGH  | DO_NOT_DELETE| HIGH |
 | 4      | 95% DISPOSABLE + 5% UNKNOWN      | LOW   | REVIEW_FIRST | MED  |
 | 5      | 60% DISPOSABLE + 40% UNKNOWN     | UNK   | REVIEW_FIRST | LOW  |
-| 6      | user docs + app data             | NONE  | REVIEW_FIRST | HIGH |
-| 7      | C:\\Users (protected)            | (excluded: I6 policy, not composition) |
+| 6      | user docs + app data             | NONE  | REVIEW_FIRST | MED  |
+| 7      | C:\\Users mix (user-value heavy) | NONE  | REVIEW_FIRST | MED  |
 | 8      | Downloads (policy)               | LOW   | REVIEW_FIRST | HIGH |
 +--------+----------------------------------+-------+--------------+------+
 
@@ -33,7 +33,8 @@ unknown) / Ex6 (0% unknown) / Ex7 (~5% unknown) all carry MEDIUM, so folder-leve
 REVIEW_FIRST confidence does NOT track unknown-byte share. It reflects certainty of
 ONE aggregate verdict over a heterogeneous composition (Ex6 spans docs + config +
 temp); folder-level HIGH is reserved for near-homogeneous or single-policy verdicts
-(Ex1, Ex2, Ex8, R1). see ROADMAP §24 risk item 8.
+(Ex1, Ex2, Ex8, R1). Table rows 6 and 7 both read MEDIUM (row 7, the C:\\Users mix,
+corrected 2026-09-14; see ROADMAP §24 risk item 9).
 
 Short-circuit order R1 -> R2 -> R3 -> R4/R5/R6:
 - R1 any PROTECTED_CRITICAL bytes      -> DO_NOT_DELETE (CRITICAL iff 100%).

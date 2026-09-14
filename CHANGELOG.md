@@ -70,6 +70,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `MEDIUM` (was HIGH) while the Downloads-policy floor (Ex8) and R1/R5 keep HIGH.
   Item-level confidence (§2) is unaffected. Docs: §2 folder-level clarification,
   §11 table row 6 + footnote, §24 risk item 8 reversion note.
+- **Ex7 canonical row-7 correction (Phase-5 close):** §11 row 7 (`C:\Users | HIGH /
+  DO_NOT_DELETE / HIGH`) corrected to the source's REVIEW_FIRST/MEDIUM. It had no live
+  code path (`kb.classify("C:\Users")` → `unknown`; the USERPROFILE subtree resolves
+  `user_profile` → USER_VALUE); "Protected" traced to the legacy `safety.py` CAUTION
+  guard color, not the composition model. Aligned the recommender docstring (table rows
+  6+7 — the row-6 HIGH was a missed remnant of the Ex6 reversion), added a canonical ex7
+  composition test and a pinned Tier-1 known-folder boundary test (Downloads/Documents/
+  Desktop/user_profile/app_data_local/app_data_roaming are never PROTECTED_CRITICAL;
+  PROGRAMDATA is the one intentional protected member). Docs: ROADMAP §11 row + footnote,
+  §24 risk item 9, `docs/SAFETY.md` §2.2. No classification code changed. Suite grew
+**313 → 315 passed, 2 skipped**.
 
 ### Added (Phase 4 — Knowledge Base, standalone / not wired)
 
