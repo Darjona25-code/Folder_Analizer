@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Phase 6 — Exports v2)
+
+- **v2 exporters** (`folder_analyzer/exporter.py`, `export_json_v2` /
+  `export_csv_v2` / `export_html_v2`): consume **only** the `ScanResult` collected
+  at scan time — **zero** knowledge-base/classifier access during export
+  (guardrail test). Enriched per-folder data: `analysis_state`, `files_analyzed`,
+  `records_retained`, `assessment`, `composition`.
+- **JSON v2 schema** (`schema_version=2`): top-level scan metrics
+  (`scan_date`, `root_path`, `total_size`, `total_files`, `total_folders`,
+  `files_analyzed`, `records_retained`, `inaccessible_count`, `folder_errors`),
+  `root_assessment`/`root_composition`, and a recursive enriched `tree`
+  (children canonically sorted). Language-neutral assessment payload
+  (enum `.value` + `reason_key` + `reason_params`).
+- **CSV/HTML v2:** new columns Recommendation / Confidence / Impact / Reason
+  (localized via `explain.resolve_reason`) / Analysis State / Files Analyzed /
+  Records Retained; top-500 rows sorted `(total_size desc, normalized path asc)`;
+  scan root never a report row. HTML escapes paths/reasons (correctness fix).
+- **Determinism:** injectable `scan_date`, canonical ordering, stable dict/field
+  construction ⇒ identical input ⇒ byte-identical output (SHA-256 hash-compare
+  test, all 3 formats).
+- **Wiring:** CLI `do_scan` returns `(FolderInfo, ScanResult)`;
+  API stores `app.state.last_scan_result` at scan time and `/api/export` returns
+  400 when the analysis is missing. v1 `export_*` functions kept for backward
+  compatibility (`test_v1_exporters_preserved`); v2 replaces v1 at the CLI/API
+  call sites.
+- **i18n:** 7 new EN/ES header keys (`col_recommendation`, `col_confidence`,
+  `col_impact`, `col_reason`, `col_analysis_state`, `col_files_analyzed`,
+  `col_records_retained`).
+- **Tests** (`tests/test_export_v2.py`): schema + enrichment, canonical ordering,
+  files-analyzed full coverage, localized ES CSV/HTML, byte-identical
+  determinism (all 3 formats), zero-reclassification guardrail (module-reference
+  inspection + 8 wrapped KB/classifier entry points), v1 preservation. API tests:
+  missing-analysis 400, JSON v2 schema on `/api/export`, `last_scan_result`
+  stored. i18n test extended. Suite grew **315 → 329 passed, 2 skipped**.
+- **Benchmark (uninstrumented headline, pinned P-cores, 50k fixture):** scan-side
+  delta of the v2 path = `t_fold(scan_result)` 0.47–0.50 ms =
+  **+0.06–0.12%**. Export generation (own honest number): JSON 2.3–2.5 ms, CSV
+  0.9 ms, HTML 0.8–1.1 ms, total 4.0–4.4 ms; 59,731 / 7,509 / 30,081 B output
+  (identical across runs). Gate alloc-peak fold+export **0.23 MiB**, retained
+  7,400 @ +0%. Runs `benchmarks/results/phase6-export-r{1..3}.json`
+  (gitignored). New harness `benchmarks/run_export.py` reuses the pinned
+  affinity methodology.
+- **Docs:** `docs/ARCHITECTURE.md` (module map → Phase 6, §6 Phase-6 benchmark
+  row), `docs/ROADMAP.md` (Phase 6 → COMPLETE, status header), `SESSION.md`.
+
 ### Added (Phase 5 — Recommendation Engine + Folder Composition + ScanResult)
 
 - **Assessment pipeline wired into the scan** (`engine/classifier.py`): tied tiers
