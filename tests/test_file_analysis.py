@@ -506,6 +506,63 @@ def test_evicted_folder_rescan_scans_only_that_folder(tmp_path):
     assert calls["stat"] == len(target_files)  # only that folder's files
 
 
+def test_retained_records_for_never_reanalyzes(tmp_path):
+    """Phase 7 UI read path (``Scanner.retained_records_for``) must be a pure
+    store read: zero scandir / zero classifier calls on an evicted folder,
+    even though the Phase-3 ``records_for`` method still re-analyzes it."""
+    import folder_analyzer.scanner as scanner_mod
+
+    tmpdir = str(tmp_path)
+    for i in range(2):
+        (tmp_path / f"r{i}.txt").write_text("x")
+    sub = tmp_path / "sub"
+    sub.mkdir()
+    for i in range(5):
+        (sub / f"s{i}.txt").write_text("x")
+
+    scanner = Scanner(max_workers=1, retention=RetentionConfig(
+        global_budget=1, per_folder_cap=10))
+    scanner.scan(tmpdir)
+
+    evicted = [p for p in (tmpdir, str(sub)) if scanner.is_evicted(p)]
+    assert len(evicted) == 1, "budget 1 across 2 folders must evict exactly one"
+    target = evicted[0]
+    kept = str(sub) if evicted[0] != str(sub) else tmpdir
+
+    calls = {"scandir": 0, "classify": 0}
+    real_scandir = scanner_mod.os.scandir
+    real_classify = scanner_mod.classify_scan
+
+    def counting_scandir(path):
+        calls["scandir"] += 1
+        return real_scandir(path)
+
+    def counting_classify(*args, **kwargs):
+        calls["classify"] += 1
+        return real_classify(*args, **kwargs)
+
+    try:
+        scanner_mod.os.scandir = counting_scandir          # type: ignore[assignment]
+        scanner_mod.classify_scan = counting_classify      # type: ignore[assignment]
+        empty = scanner.retained_records_for(target)
+        read = scanner.retained_records_for(kept)
+    finally:
+        scanner_mod.os.scandir = real_scandir
+        scanner_mod.classify_scan = real_classify
+
+    assert empty == ()
+    assert scanner.is_evicted(target) is True
+    assert read is not None      # retained folder still served from the store
+    assert calls == {"scandir": 0, "classify": 0}
+
+    # Contrast: the Phase-3 on-demand path still re-analyzes the same evicted
+    # folder (single-folder re-scan), proving the two methods are distinct.
+    resurveyed = scanner.records_for(target)
+    assert {r.filename for r in resurveyed} == {
+        n for n in os.listdir(target) if os.path.isfile(os.path.join(target, n))
+    }
+
+
 def _shutil_rmtree(path):
     import shutil
     shutil.rmtree(path, ignore_errors=True)

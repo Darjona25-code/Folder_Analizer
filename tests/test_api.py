@@ -6,6 +6,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
+from folder_analyzer.engine.explain import resolve_reason
+from folder_analyzer.safety import is_deletable
+
+
+def ui_action_enabled(deletable, recommendation):
+    """Mirror of app.js isActionEnabled(): independent per-item authority."""
+    return bool(deletable and recommendation == "safe_to_delete")
+
 
 client = TestClient(app)
 
@@ -409,9 +417,6 @@ def test_i10_gating_rule_data_is_served_consistently(tmp_dir):
     files = client.get("/api/folder/files", params={"path": os.path.join(tmp_dir, "sub1")}).json()["files"]
     assert files, "sub1 holds retained records"
 
-    def ui_action_enabled(deletable, recommendation):
-        return bool(deletable and recommendation == "safe_to_delete")
-
     # mirror of app.js isActionEnabled(): independent per-item authority.
     assert ui_action_enabled(True, "safe_to_delete") is True     # file SAFE → actionable
     assert ui_action_enabled(True, "review_first") is False      # folder REVIEW_FIRST → gated
@@ -421,3 +426,96 @@ def test_i10_gating_rule_data_is_served_consistently(tmp_dir):
         assert "deletable" in f and "recommendation" in f
     for t in top:
         assert "deletable" in t and "recommendation" in t["assessment"]
+
+
+def _find_folder(data, name):
+    def walk(d):
+        if d["name"] == name:
+            return d
+        for c in d.get("children", []):
+            hit = walk(c)
+            if hit:
+                return hit
+        return None
+
+    return walk(data["root"])
+
+
+def test_i10_safe_file_inside_review_first_folder_is_actionable(scan_sandbox):
+    """I10 at the served-surface level: a disposable SAFE/HIGH file directly
+    inside a REVIEW_FIRST folder is individually actionable, while the folder's
+    own bulk action is gated — with proof that `deletable` and `recommendation`
+    are each per-item values, never inherited."""
+    root = str(scan_sandbox)
+    mixed = os.path.join(root, "mixed")
+    os.makedirs(mixed)
+    # user_value sibling forces the folder to R2 (REVIEW_FIRST)...
+    with open(os.path.join(mixed, "report.docx"), "w") as f:
+        f.write("proprietary content nobody should lose")
+    # ...while this file is disposable by its own evidence (SAFE/HIGH).
+    with open(os.path.join(mixed, "tmp_123.tmp"), "w") as f:
+        f.write("x" * 200)
+
+    data = client.post("/api/scan", json={"path": root}).json()
+    folder = _find_folder(data, "mixed")
+    assert folder is not None
+    folder_assessment = folder["assessment"]
+
+    # 1) The folder's OWN assessment: REVIEW_FIRST from its own user-value bytes.
+    assert folder_assessment["recommendation"] == "review_first"
+    assert folder_assessment["reason_key"] == "r2_user_value"
+    # 2) `deletable` is the per-path protection guard — this marker-free sandbox
+    #    path is not CRITICAL, so the guard alone does NOT block the folder;
+    #    the recommendation term is what gates the bulk action.
+    assert folder["deletable"] is True
+    assert is_deletable(folder["path"]) == folder["deletable"]
+    assert ui_action_enabled(folder["deletable"], folder_assessment["recommendation"]) is False
+
+    # 3) The file serves its OWN independent values (per-record serialization).
+    payload = client.get(
+        "/api/folder/files", params={"path": mixed, "lang": "en"}
+    ).json()
+    assert payload["evicted"] is False
+    safe = next(f for f in payload["files"] if f["name"] == "tmp_123.tmp")
+    assert safe["deletable"] is True
+    assert safe["recommendation"] == "safe_to_delete"
+    assert safe["confidence"] == "high"
+    assert is_deletable(safe["path"]) == safe["deletable"]
+    assert ui_action_enabled(safe["deletable"], safe["recommendation"]) is True
+
+    # 4) The enable rules genuinely diverge between folder and file.
+    assert ui_action_enabled(folder["deletable"], folder_assessment["recommendation"]) != \
+        ui_action_enabled(safe["deletable"], safe["recommendation"])
+
+
+def test_api_serves_interpolated_reason_params(scan_sandbox):
+    """No Phase-2 (d0d42c0) regression on the new surface: a reason WITH
+    parameters produced by a real scan is served fully interpolated by the
+    API -> UI path — real value, no raw placeholder, no params-less generic."""
+    root = str(scan_sandbox)
+    os.makedirs(os.path.join(root, "unknownonly"))
+    with open(os.path.join(root, "unknownonly", "cache_x.bin"), "w") as f:
+        f.write("p" * 200)  # marker-free, extensionless-to-rules -> UNKNOWN
+
+    data = client.post("/api/scan", json={"path": root}).json()
+    folder = _find_folder(data, "unknownonly")
+    assert folder is not None
+    a = folder["assessment"]
+    assert a["reason_key"] == "r3_unknown"
+    assert a["reason_params"] and "unknown_share" in a["reason_params"]
+
+    served = a["reason"]
+    expected = resolve_reason("r3_unknown", lang="en", params=a["reason_params"])
+    assert served == expected
+    # Interpolated REAL value (100.0% share), not a placeholder and not a
+    # params-less generic string.
+    assert "100.0%" in served
+    assert "{" not in served and "}" not in served
+    assert served != "r3_unknown"
+    assert served != resolve_reason("r3_unknown", lang="en", params=None)
+
+    es = client.post("/api/scan", params={"lang": "es"}, json={"path": root})
+    folder_es = _find_folder(es.json(), "unknownonly")
+    assert folder_es["assessment"]["reason"] == resolve_reason(
+        "r3_unknown", lang="es", params=a["reason_params"]
+    )
