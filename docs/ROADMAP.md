@@ -633,8 +633,10 @@ Fixed process (re-affirmed):
 - **Status: COMPLETE (delivered 2026-09-14).** Suite 369 passed / 2 skipped
   (+12). Raw smoke `t_scan` 0.309–0.311 s / export 0.3549 s on the closed
   run's fixed mask (0xc00) — **−13.6% / −7.6% vs the Phase-7 code state
-  re-measured on the same core pair** (archival mask 0x3 drifted; see
-  ARCHITECTURE §6c). KB dispatch 2.4–2.7 µs/file, classifier 2.1–2.3 µs/file
+re-measured on the same core pair** (the archival mask 0x3 figure was a
+   retracted 2.1 s reading — corrected 2026-09-14 in ARCHITECTURE §6c: 0x3
+   re-measures 0.324–0.351 s at HEAD, no P-core identity drift). KB dispatch
+   2.4–2.7 µs/file, classifier 2.1–2.3 µs/file
   (Phase-5 close: 4.7). Gate alloc-peak 0.26 MiB + retained 7,400 @ +0%;
   export output byte-identical (59,862 / 7,509 / 30,081 B). Cancellation
   stops within **≈8 ms** of the request (partial `ScanResult.cancelled=True`).

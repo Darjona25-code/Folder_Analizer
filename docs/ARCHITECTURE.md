@@ -265,7 +265,7 @@ LP-E ~2.7 s for the 50k scan), and RSS-delta is a working-set sampling artifact 
 | **5** | 4.204–4.310 (4-run) | ~11,600–11,900 | **13.13–14.37** (4 runs) | **7,400** | 36.43–38.88 | **Phase 5: recommendation engine (Assessment) + folder composition wired into the scan path**, plus classifier + KB module caching and path-normalize hoisting (all instrumented). Representative gate deltas vs 4′ (mean 12.01): **+13.9% (mean-to-mean) / +15.9% (median)**; best-to-best +12.8%, worst-to-worst +14.0% — within the 20% gate. (A coincidental max-vs-min pairing reached +20.6%; repeated clean runs show it is the noise band, not a stable condition — see §6a.) **Uninstrumented (direct wall-clock): Phase 4 0.137–0.151 s → Phase 5 0.778–0.787 s = +445% (5.5×) REAL cost.** tracemalloc inflates *both* phases ~6–7× (metadata scan 0.985–1.006 s instrumented vs 0.14 s plain), so instrumented wall is not interpreted as real cost. The +445% is genuine new classification/composition work **flagged as a Phase 8 (Performance & Scale) priority** — see §6a. Runs (locally, `benchmarks/results/` gitignored): `benchmarks/results/phase5-pinned-r{1..3}.json`, `phase5-pinned.json`, plus 4 clean remeasures. |
 | **6** | 0.470 (uninstrumented; 0.494 ms `scan_result` fold added) | ~119,000 | fold+export **0.26** | **7,400** | n/a | **Phase 6: Exports v2 — no scanner hot-path change.** v2 exporters consume the collected ScanResult only; scan-side delta = `Scanner.scan_result()` fold **0.494 ms = +0.11%** (uninstrumented, pinned P-cores [`0,1`], 50k fixture). **Export generation (own honest number, after the recursive-composition fold): JSON 2.6 ms / CSV 0.9 ms / HTML 0.8 ms (total 4.3 ms)**; output 59,862 / 7,509 / 30,081 B, byte-identical across runs. **Composition fields are the full recursive aggregation** (`root_composition.total_bytes == total_size`), folded from scan-time `FolderComposition` values — no engine access. Runs: `benchmarks/results/phase6-export-r{1..3}.json` (`benchmarks/run_export.py`). |
 | **7** | 0.414 (uninstrumented) | ~120,655 | fold+export **0.26** | **7,400** | 16.32 | **Phase 7: Web UI + single-source i18n — NO scan hot-path change (engine/classifier/KB untouched).** Locale files load once at import. `t_scan` 0.414–0.416 s, `t_fold(scan_result)` **0.492 ms = +0.12%** (Phase 6: 0.494 ms), export generation JSON 2.4 / CSV 1.1 / HTML 1.2 ms (total 4.7 ms), gate alloc-peak **0.26 MiB**, retained **7,400 @ +0%**, output bytes byte-identical at 59,862 / 7,509 / 30,081. UI/per-file reads go through read-only `Scanner.retained_records_for` (zero re-classification) and `/api/i18n` serves the same locale files the CLI/exports use. |
-| **8** | **0.309–0.311** (uninstrumented, `--affinity 0xc00`) | ~160,600 | fold+export **0.26** | **7,400** | 16.5 | **Phase 8: Performance & Scale — hot-path optimization + cancellation + reproducible harness.** O1 single `_policy_for` + inlined bucket (`classifier.classify_scan`), O2 bounded per-folder filename verdict cache (`kb`), `--affinity HEX` fixed-mask pinning. Raw smoke `t_scan` 0.309–0.311 s on the machine's fastest pair (mask 0xc00 = cpus 10,11); **paired same-mask re-run of the Phase-7 code state: 0.36 s smoke / 0.3841 s export → −13.6% / −7.6%** (the archival 0.414 row was mask 0x3 = cpus 0,1, which measured 2.1 s at Phase-8 close — P-core identity drifted, see §6c). Classification measured **KB dispatch 2.4–2.7 µs/file, full classifier 2.1–2.3 µs/file** (Phase-5 close: 4.7). Cancellation: **≈8 ms to stop** after `POST /api/scan/cancel` at 100 ms (17,505/50,000 files, 13/37 folders), partial `ScanResult.cancelled=True`. **Byte-identical**: exports 59,862 / 7,509 / 30,081 B unchanged; 369 tests green (357 prior + 12 new). Evidence: `benchmarks/results/smoke_p8_*.json`, §6c. |
+| **8** | **0.309–0.311** (uninstrumented, `--affinity 0xc00`) | ~160,600 | fold+export **0.26** | **7,400** | 16.5 | **Phase 8: Performance & Scale — hot-path optimization + cancellation + reproducible harness.** O1 single `_policy_for` + inlined bucket (`classifier.classify_scan`), O2 bounded per-folder filename verdict cache (`kb`), `--affinity HEX` fixed-mask pinning. Raw smoke `t_scan` 0.309–0.311 s on the machine's fastest pair (mask 0xc00 = cpus 10,11); **paired same-mask re-run of the Phase-7 code state: 0.36 s smoke / 0.3841 s export → −13.6% / −7.6%** (the archival 0.414 row was mask 0x3 = cpus 0,1; an early Phase-8 reading claimed 2.1 s on that mask — **retracted and corrected 2026-09-14 in §6c**: 0x3 re-measured 0.324–0.351 s at HEAD, no P-core identity drift). Classification measured **KB dispatch 2.4–2.7 µs/file, full classifier 2.1–2.3 µs/file** (Phase-5 close: 4.7). Cancellation: **≈8 ms to stop** after `POST /api/scan/cancel` at 100 ms (17,505/50,000 files, 13/37 folders), partial `ScanResult.cancelled=True`. **Byte-identical**: exports 59,862 / 7,509 / 30,081 B unchanged; 369 tests green (357 prior + 12 new). Evidence: `benchmarks/results/smoke_p8_*.json`, §6c. |
 
 ### 6a. Performance evidence for the Phase 5 close (reviewer-required remeasure)
 
@@ -344,37 +344,57 @@ documented). Envelope RSS is informational. See `docs/ROADMAP.md §15/§22`.
 
 ### 6c. Phase 8 performance evidence (direct, same-mask comparisons)
 
-Re-run 2026-09-14 on the deterministic 50k fixture. **P-core identity warning:** the
-probe ranking is machine-state dependent — at Phase-5/6/7 close it reported
-`[0,1]` (mask 0x3) as the fastest pair; at Phase-8 close the same probe reports
-`[10,11]` (mask 0xc00), and pinning to 0x3 now yields 2.1 s vs 0.311 s on 0xc00.
-Cross-phase wall-clock rows therefore live on **different core pairs** unless pinned
-with the explicit `--affinity` flag. The honest Phase-8 close is the **paired
-same-state run**: the Phase-7 code state, re-measured this session on the same
-0xc00 pair, is the denominator below. `--affinity 0xc00` is the new closing-run
-convention (see Reference environment §7 for the copy-pasteable commands).
+Re-run 2026-09-14 on the deterministic 50k fixture. Cross-phase wall-clock rows
+use the same `--affinity` mask on both sides so core placement cannot distort a
+delta. Probe ranking is re-evaluated every session by `_probe_fast_cores` and is
+machine-state dependent (Phase-5/6/7 close sat on `[0,1]` = mask 0x3; Phase-8
+close on `[10,11]` = mask 0xc00) — **there is no stable P-core identity drift.**
+> **Dated correction (2026-09-14):** the Phase-8 close first claimed mask 0x3
+> "now measures 2.1 s vs 0.311 s on 0xc00" (P-core identity drift). That figure
+> is **retracted**: it is not reproducible on either mask. Direct re-measurement
+> through the same harness shows both masks inside the same band, so the delta
+> was a single transient reading, not a core-placement property. Corrected
+> matrix (same 50k fixture, raw uninstrumented `t_scan`):
+
+| mask | 09e38eb (pre-optimization state) | HEAD (Phase 8) |
+|---|---|---|
+| 0x3 (cpus 0,1) | 0.425 / 0.412 s | 0.324 / 0.324 / 0.351 s |
+| 0xc00 (cpus 10,11) | 0.357 / 0.358 s (+1 outlier 0.486) | 0.308 / 0.337 s |
+
+Pairwise means: 09e38eb 0x3 **0.419 s** ↔ HEAD 0x3 **0.333 s → −20.4%**;
+09e38eb 0xc00 **0.358 s** ↔ HEAD 0xc00 **0.323 s → −9.8%**. Within either state
+the masks overlap (HEAD: 0x3 0.324–0.351 vs 0xc00 0.308–0.337); single-run
+`t_scan` jitter is ~15–30%, so no mask "wins" outside the noise band and core
+selection is an implementation detail, not a correctness dimension. The Phase-8
+close below compares the same 0xc00 pair on both states; `--affinity 0xc00` is
+the closing-run convention (commands in §7).
 
 | Measurement (50k fixture, same pair 0xc00 unless noted) | Phase 7 state (re-measured) | Phase 8 (HEAD) | delta |
 |---|---|---|---|
 | `run_export` t_scan, uninstrumented | 0.3841 s | 0.3549 s | **−7.6%** |
 | `run_smoke` t_scan, uninstrumented | 0.360 s | 0.309–0.311 s (n=3) | **−13.6%** |
-| `run_export` t_fold (`scan_result`) | 0.411 ms | 0.424 ms | +0.13 pt (flat) |
+| `run_export` t_fold (`scan_result`) | 0.411 ms | 0.424 ms | **+3.2% (two readings, within noise)** |
 | gate: fold+export alloc-peak | 0.26 MiB | 0.26 MiB | **0%** |
 | gate: full-scan alloc-peak (instrumented) | 12.62 / 13.29 MiB | 12.88 / 12.88 MiB | flat (±2%) |
 | gate: retained records / export bytes | 7,400 / 59,862·7,509·30,081 | 7,400 / 59,862·7,509·30,081 | **0% / byte-identical** |
 | KB classification cost (µs/file) | 4.7 (Phase-5 close) | KB dispatch **2.4–2.7**, classifier **2.1–2.3** | ~2× faster |
 | cancellation responsiveness | n/a | **≈8 ms** (107.5 ms stop with 100 ms cancel timer) | new metric |
 
-Noise band: raw `t_scan` on 0xc00 spans ±1% across consecutive runs (0.309/0.310/
-0.311); instrumented wall is inflated ~6× by tracemalloc (1.9 s vs 0.31 s raw) and is
-not interpreted as real cost, exactly as documented in §6a. The scan hot path and the
-name cache are output-neutral: the 8 canonical composition examples, the
-`test_kb_scan_parity` byte-parity suite, and the byte-identical export
-SHA-256 (`test_byte_identical_determinism`) all pass unmodified on the optimized code.
-`git diff HEAD~1 --stat` for this phase touches `scanner.py`, `engine/classifier.py`,
-`engine/models.py`, `engine/kb/__init__.py`, `api/routes.py`, `benchmarks/`, and
-`tests/` only — the recommender, retention, safety, enums, explain and KB tier
-tables (categories/apps/env/registry/content) are untouched.
+Noise band: raw `t_scan` jitters ~15–30% single-run (HEAD: 0x3 0.324–0.351,
+0xc00 0.308–0.337); an earlier "±1% across consecutive runs" framing came from a
+short same-pair sequence and is superseded by the corrected matrix above.
+Instrumented wall is inflated ~6× by tracemalloc (1.9 s vs 0.31 s raw) and is
+not interpreted as real cost, exactly as documented in §6a. `t_fold` 0.411 →
+0.424 ms = **+3.2%** (scan-side 0.107% → 0.119% of t_scan) — a two-reading delta
+inside the noise band, reported honestly as consistent-with-flat. The scan
+hot path and the name cache are output-neutral: the 8 canonical composition
+examples, the `test_kb_scan_parity` byte-parity suite, and the byte-identical
+export SHA-256 (`test_byte_identical_determinism`) all pass unmodified on the
+optimized code. `git diff HEAD~1 --stat` for this phase touches `scanner.py`,
+`engine/classifier.py`, `engine/models.py`, `engine/kb/__init__.py`,
+`api/routes.py`, `benchmarks/`, and `tests/` only — the recommender, retention,
+safety, enums, explain and KB tier tables (categories/apps/env/registry/content)
+are untouched.
 
 ## 7. Reference environment
 
