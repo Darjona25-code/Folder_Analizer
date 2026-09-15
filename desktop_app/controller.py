@@ -117,6 +117,44 @@ class DesktopController:
             and assessment.recommendation is DeletionRecommendation.SAFE_TO_DELETE
         )
 
+    def delete_folders(
+        self,
+        paths: List[str],
+        confirm=None,
+    ) -> List[dict]:
+        from folder_analyzer.security_guard import (
+            GuardStatus,
+            revalidate,
+            validate_delete_target,
+        )
+        from send2trash import send2trash
+
+        results: List[dict] = []
+        for path in paths:
+            verdict = validate_delete_target(
+                path, scan_root=self._last_scan_root
+            )
+            if verdict.status is not GuardStatus.OK:
+                results.append(
+                    {"path": path, "status": "blocked", "reason": verdict.reason}
+                )
+                continue
+            if confirm is not None and not confirm(path):
+                results.append({"path": path, "status": "cancelled"})
+                continue
+            final = revalidate(path, scan_root=self._last_scan_root)
+            if not final.ok:
+                results.append(
+                    {"path": path, "status": "blocked", "reason": final.reason}
+                )
+                continue
+            try:
+                send2trash(path)
+                results.append({"path": path, "status": "deleted"})
+            except Exception as exc:
+                results.append({"path": path, "status": "error", "reason": str(exc)})
+        return results
+
     @property
     def last_scan_root(self) -> Optional[str]:
         return self._last_scan_root

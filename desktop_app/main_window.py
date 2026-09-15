@@ -6,10 +6,10 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from desktop_app.controller import DesktopController
 from desktop_app.worker import ScanWorker
+from folder_analyzer.scanner import ScanCancellation
 from folder_analyzer.utils import format_size
 
 _COL_KEYS = (
@@ -39,6 +40,7 @@ class MainWindow(QMainWindow):
         self.controller = DesktopController()
         self._worker = None
         self._result = None
+        self._cancellation = None
         self._build_ui()
         self._retranslate()
 
@@ -67,10 +69,12 @@ class MainWindow(QMainWindow):
         self._cancel_button = QPushButton(self)
         self._cancel_button.setEnabled(False)
         self._toolbar.addWidget(self._cancel_button)
+        self._cancel_button.clicked.connect(self._cancel_scan)
 
         self._delete_button = QPushButton(self)
         self._delete_button.setEnabled(False)
         self._toolbar.addWidget(self._delete_button)
+        self._delete_button.clicked.connect(self._run_delete)
 
         central = QWidget(self)
         layout = QVBoxLayout(central)
@@ -92,6 +96,7 @@ class MainWindow(QMainWindow):
         self._table.setColumnWidth(0, 240)
         self._table.setColumnWidth(1, 90)
         self._table.setColumnWidth(2, 70)
+        self._table.itemSelectionChanged.connect(self._update_delete_state)
         layout.addWidget(self._table)
 
         self.setCentralWidget(central)
@@ -129,28 +134,53 @@ class MainWindow(QMainWindow):
         self._set_notice(None)
         self._table.setRowCount(0)
         self._delete_button.setEnabled(False)
+        self._cancellation = ScanCancellation()
+        self._cancel_button.setEnabled(True)
         self.statusBar().showMessage(self.controller.t("scanning", path=path))
-        self._worker = ScanWorker(self.controller, os.path.normpath(path), None, self)
+        self._worker = ScanWorker(
+            self.controller, os.path.normpath(path), self._cancellation, self
+        )
         self._worker.finished_ok.connect(self._on_scan_finished)
         self._worker.failed.connect(self._on_scan_failed)
         self._worker.start()
+
+    def _cancel_scan(self):
+        if self._cancellation is not None:
+            self._cancellation.cancel()
+            self._cancel_button.setEnabled(False)
 
     def _on_scan_finished(self, result):
         self._result = result
         self._populate()
         self._scan_button.setEnabled(True)
-        self.statusBar().showMessage(
-            self.controller.t(
-                "scan_complete_detail",
-                size=format_size(result.total_descendant_size),
-                count=result.files_analyzed,
-            ),
-            5000,
-        )
+        self._cancel_button.setEnabled(False)
+        if result.cancelled:
+            self._set_notice(
+                self.controller.t("scan_cancelled")
+                + " "
+                + self.controller.t(
+                    "scan_cancelled_detail",
+                    size=format_size(result.total_descendant_size),
+                    count=result.files_analyzed,
+                )
+            )
+            self.statusBar().showMessage(
+                self.controller.t("scan_cancelled"), 5000
+            )
+        else:
+            self.statusBar().showMessage(
+                self.controller.t(
+                    "scan_complete_detail",
+                    size=format_size(result.total_descendant_size),
+                    count=result.files_analyzed,
+                ),
+                5000,
+            )
         self._cleanup_worker()
 
     def _on_scan_failed(self, message):
         self._scan_button.setEnabled(True)
+        self._cancel_button.setEnabled(False)
         self.statusBar().showMessage(
             self.controller.t("scan_error_detail", message=message), 5000
         )
@@ -182,6 +212,71 @@ class MainWindow(QMainWindow):
                     item.setData(Qt.UserRole + 1, row["action"])
                     item.setToolTip(row["path"])
                 self._table.setItem(i, col, item)
+
+    def _update_delete_state(self):
+        enabled = False
+        for item in self._table.selectedItems():
+            if item.column() == 0 and item.data(Qt.UserRole + 1):
+                enabled = True
+                break
+        self._delete_button.setEnabled(enabled)
+
+    def _run_delete(self):
+        selected = {
+            item.data(Qt.UserRole)
+            for item in self._table.selectedItems()
+            if item.column() == 0 and item.data(Qt.UserRole)
+        }
+        attempts = []
+        skipped = 0
+        for path in selected:
+            enabled = any(
+                item.column() == 0
+                and item.data(Qt.UserRole) == path
+                and item.data(Qt.UserRole + 1)
+                for item in self._table.selectedItems()
+            )
+            if not enabled:
+                skipped += 1
+                continue
+            attempts.append(path)
+        deleted = 0
+        blocked = 0
+        if attempts:
+            results = self.controller.delete_folders(
+                attempts, confirm=self._confirm_delete
+            )
+            for outcome in results:
+                if outcome["status"] == "deleted":
+                    deleted += 1
+                elif outcome["status"] == "blocked":
+                    blocked += 1
+                elif outcome["status"] == "error":
+                    self.statusBar().showMessage(
+                        self.controller.t(
+                            "delete_failed",
+                            path=outcome["path"],
+                            error=outcome["reason"],
+                        ),
+                        5000,
+                    )
+        total_blocked = blocked + skipped
+        if total_blocked or deleted:
+            self.statusBar().showMessage(
+                self.controller.t(
+                    "toast_delete_blocked", b=total_blocked, d=deleted
+                ),
+                5000,
+            )
+        self._update_delete_state()
+
+    def _confirm_delete(self, path) -> bool:
+        answer = QMessageBox.question(
+            self,
+            self.controller.t("confirm_delete_title"),
+            self.controller.t("confirm_folder_body"),
+        )
+        return answer == QMessageBox.StandardButton.Yes
 
     def _set_notice(self, text: str | None):
         if text:
