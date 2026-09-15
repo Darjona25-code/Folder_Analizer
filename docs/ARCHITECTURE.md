@@ -1,13 +1,16 @@
 # Folder Analyzer — Architecture
 
-Status: **Phase 8 — Performance & Scale** (hot-path optimization, cancellation,
-reproducible benchmark harness). Phases 5 (recommendation engine + folder
+Status: **Phase 8 — Performance & Scale** (hot-path optimization, cancellation
+surfaced end-to-end, reproducible benchmark harness) — delivered; both
+pre-acceptance blockers closed with dated corrections (2026-09-14; §6c +
+CHANGELOG/SESSION/ROADMAP). Phases 5 (recommendation engine + folder
 composition), 6 (Exports v2) and 7 (Web UI + single-source i18n) are
-closed/approved. This document
+closed/approved. Phase 8 awaits the user's formal written acceptance before
+any next-phase work. This document
 intentionally contains only the core/interface boundary, the current module map, the
-CLI/Web/Desktop relationship, and the benchmark table. Performance (§ Phase 8) and
-desktop (§ Phase 9/10) sections will be expanded in their respective phases; the
-locales/UI map is current as of Phase 7.
+CLI/Web/Desktop relationship, and the benchmark table. Performance (Phase 8) and
+desktop (Phase 9/10) sections will be expanded in their respective phases; the
+locales/UI map is current as of Phase 8.
 
 ---
 
@@ -35,7 +38,7 @@ Interfaces:
 - **Desktop** (PySide6, Phase 9+) consumes the core **directly in-process**. There is
   **no** `Desktop → localhost FastAPI → Core` path.
 
-## 2. Current module map (Phase 7)
+## 2. Current module map (Phase 8)
 
 | Module | Responsibility | Boundary |
 |---|---|---|

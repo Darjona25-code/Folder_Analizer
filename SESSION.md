@@ -32,7 +32,7 @@ Root-folder exclusion and scan-root deletion protection (CLI + API), clean EOF h
 - Python 3.10+ (tested on 3.12)
 - Rich (terminal UI), send2trash (Recycle Bin), psutil (disk info)
 - FastAPI + Uvicorn (web), httpx (API testing)
-- pytest — 81 tests passing
+- pytest — 375 tests passing (2 skipped) at Phase 8 close/corrections
 
 ### To continue development
 
@@ -424,3 +424,18 @@ any other engine change out of bounds. Zero behavior change to outputs.
   2 skipped** (+6 for the two blockers); cancellation is now surfaced end-to-end
   (API `ScanResponse.cancelled`, CLI PARTIAL notice, additive export markers,
   web UI localized notice) — see CHANGELOG correction entry.
+
+## Actualización (2026-09-15) — evidence gap closed + pre-next-phase doc refresh
+
+- **Evidence gap closed:** the three blocker test bodies and the corrected doc
+  text (ARCHITECTURE §6c, CHANGELOG correction entry, SESSION corrections,
+  ROADMAP Phase-8 block) were pasted verbatim from disk on request; the
+  Phase-8 re-close report was accepted in substance by the user.
+- **Documentation refresh (user-requested):** ROADMAP status header + Phase 8/9
+  status blocks, ARCHITECTURE status header + module-map caption, and README
+  (test counts, `/api/scan/cancel` endpoint, cancellation feature) brought to
+  the current state. No code changed; nothing outside documentation was edited.
+- **Current state at this date:** suite **375 passed / 2 skipped**; HEAD at the
+  two blocker commits (`552625b`, `dfce81e`); Phase 8 blockers closed; formal
+  written acceptance pending; next phase **NOT STARTED** and must not begin
+  without explicit written approval.

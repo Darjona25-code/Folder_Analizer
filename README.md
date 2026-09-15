@@ -15,6 +15,7 @@ A disk space analyzer that scans any drive or folder, reports folder sizes, and 
 - **Safe deletion** — Sends files to the Recycle Bin (recoverable) instead of permanent delete
 - **Export reports** — JSON, CSV, or a self-contained HTML report
 - **Bilingual** — Full English and Spanish support (CLI `--lang en`/`es`, API `lang` parameter, localized exports)
+- **Scan cancellation** — CLI/API scans stop on request and are explicitly marked PARTIAL, never presented as silently complete
 
 ## Installation
 
@@ -99,7 +100,8 @@ Then open <http://127.0.0.1:8000>. The interface shows drive stats plus the scan
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `POST` | `/api/scan` | Scan a folder. Body `{"path": "..."}`. Returns root tree, stats, and top folders |
+| `POST` | `/api/scan` | Scan a folder. Body `{"path": "..."}`. Returns root tree, stats, top folders, and a `cancelled` flag |
+| `POST` | `/api/scan/cancel` | Request cancellation of an in-flight scan (partial result returned, marked `cancelled: true`) |
 | `GET` | `/api/folders` | Top folder list from the last scan (`?limit=50`) |
 | `GET` | `/api/stats` | Total size/files/folders + scan path of the last scan |
 | `POST` | `/api/delete` | Send folders to Recycle Bin. Body `{"paths":[...]}`. Scanned root + ancestors, and CRITICAL paths are always blocked |
@@ -134,7 +136,7 @@ Folder_Analizer/
 │   ├── css/style.css
 │   ├── js/app.js
 │   └── assets/                # Branding (Caza Bytes)
-├── tests/                     # 81 unit + integration tests
+├── tests/                     # 375 unit + integration tests (2 skipped)
 ├── requirements.txt
 ├── pyproject.toml
 ├── LICENSE                    # MIT
@@ -148,7 +150,7 @@ pip install pytest
 pytest tests/
 ```
 
-81 tests cover the scanner, safety rules, deletion (protected paths, iterative traversal), the CLI (EOF handling, drill-down), exports (localization), the API (state, root protection), and model defaults.
+375 tests (2 skipped) cover the scanner, safety rules, deletion (protected paths, iterative traversal), the CLI (EOF handling, drill-down, cancellation announcement), exports (localization + v2 determinism and cancelled-markers), the API (state, root protection, cancellation), recommendation/composition, locale parity, knowledge-base cache parity, and web-asset audits. Run individual files with `pytest tests/test_<area>.py`.
 
 ## Dependencies
 

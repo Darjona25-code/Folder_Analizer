@@ -30,6 +30,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `cancelled: true` in the scan response (concurrent cancel), JSON/CSV/HTML
   v2 cancelled-markers, CLI PARTIAL announcement, web-assets notice wiring.
 
+### Changed (2026-09-15 — pre-next-phase documentation refresh)
+
+- **Docs brought to current state (no code changed):** ROADMAP status header
+  and Phase 8/9 status blocks (Phase 8 complete with blockers closed; Phase 9
+  **NOT STARTED**, requires explicit written approval), ARCHITECTURE status
+  header + module-map caption, README (suite 375 / 2 skipped, `/api/scan/cancel`
+  endpoint, cancellation feature), SESSION dated entry summarizing the closed
+  evidence gap and the refresh.
+
 ### Added (Phase 8 — Performance & Scale)
 
 - **Hot-path optimization (engine):** `classifier.classify_scan` now calls
