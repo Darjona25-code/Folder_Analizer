@@ -7,6 +7,26 @@ class ScanRequest(BaseModel):
     path: str
 
 
+class AssessmentView(BaseModel):
+    """Per-folder / per-file v2 assessment served to the UI.
+
+    ``reason`` is the LOCALIZED, interpolated text (single-source locale
+    files); ``reason_key`` is carried for audit parity only and is never
+    rendered by the web frontend.
+    """
+
+    recommendation: str = ""
+    confidence: str = ""
+    impact: str = ""
+    reason_key: str = ""
+    reason_params: dict | None = None
+    detected_category: str | None = None
+    app_id: str | None = None
+    is_user_data: bool = False
+    is_temporary: bool = False
+    reason: str = ""
+
+
 class FolderDict(BaseModel):
     path: str
     name: str
@@ -19,6 +39,9 @@ class FolderDict(BaseModel):
     risk: str = "safe"
     risk_color: str = "#3fb950"
     deletable: bool = True
+    assessment: "AssessmentView | None" = None
+    composition: dict | None = None
+    recursive_total: int | None = None
 
 
 class ScanStats(BaseModel):
@@ -64,3 +87,37 @@ class DiskInfo(BaseModel):
     used: int
     free: int
     percent: float
+
+
+class FileDict(BaseModel):
+    """Per-file v2 row served to the UI (retained records only, zero
+    re-classification). ``reason`` is localized; ``reason_key`` never
+    rendered by the frontend. ``deletable`` is the OS/protection guard so the
+    UI can enable/disable the single-file action."""
+
+    path: str
+    name: str
+    size: int = 0
+    deletable: bool = True
+    category: str | None = None
+    app_id: str | None = None
+    is_user_data: bool = False
+    is_temporary: bool = False
+    recommendation: str = ""
+    confidence: str = ""
+    impact: str = ""
+    reason_key: str = ""
+    reason: str = ""
+
+
+class FolderFilesResponse(BaseModel):
+    folder_path: str
+    evicted: bool
+    files: list[FileDict]
+    folder_assessment: "AssessmentView | None" = None
+
+
+class I18nResponse(BaseModel):
+    lang: str
+    ui: dict[str, str]
+    reasons: dict[str, str]

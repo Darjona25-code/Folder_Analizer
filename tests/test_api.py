@@ -285,3 +285,139 @@ def test_top_folders_are_children_not_root(tmp_dir):
         assert top["path"] in root_children or top["path"].startswith(
             os.path.normpath(tmp_dir) + os.sep
         )
+
+
+# ---------------------------------------------------------------------------
+# Phase 7 — v2 contract surfaces served to the Web UI.
+# ---------------------------------------------------------------------------
+
+def _scan_data(tmp_dir, lang="en"):
+    return client.post("/api/scan", json={"path": tmp_dir}, params={"lang": lang}).json()
+
+
+def test_scan_response_carries_v2_assessment_and_composition(tmp_dir):
+    data = _scan_data(tmp_dir)
+    root = data["root"]
+    assert root["assessment"] is not None
+    assert set(root["assessment"]).issuperset(
+        {"recommendation", "confidence", "impact", "reason_key", "reason"}
+    )
+    assert root["composition"] is not None
+    assert root["recursive_total"] == root["total_size"]
+    for top in data["top_folders"]:
+        assert top["assessment"] is not None
+        assert "reason" in top["assessment"]
+
+
+def test_scan_locale_localizes_reasons(tmp_dir):
+    en = _scan_data(tmp_dir, lang="en")
+    es = _scan_data(tmp_dir, lang="es")
+    en_keys = {a["reason_key"] for a in [en["root"]["assessment"]] + [t["assessment"] for t in en["top_folders"]]}
+    es_keys = {a["reason_key"] for a in [es["root"]["assessment"]] + [t["assessment"] for t in es["top_folders"]]}
+    assert en_keys and es_keys
+    assert en_keys == es_keys
+    assert {a["reason"] for a in [en["root"]["assessment"]] + [t["assessment"] for t in en["top_folders"]]} != {
+        a["reason"] for a in [es["root"]["assessment"]] + [t["assessment"] for t in es["top_folders"]]
+    }
+
+
+def test_i18n_endpoint_serves_single_source_ui_and_reasons():
+    en = client.get("/api/i18n", params={"lang": "en"}).json()
+    es = client.get("/api/i18n", params={"lang": "es"}).json()
+    assert "ui" in en and "reasons" in en
+    assert set(en["ui"]) == set(es["ui"])
+    assert set(en["reasons"]) == set(es["reasons"])
+    assert "uncertain" in en["reasons"]
+
+
+def test_folder_files_returns_localized_retained_records(tmp_dir):
+    data = _scan_data(tmp_dir)
+    sub1 = os.path.join(tmp_dir, "sub1")
+    response = client.get("/api/folder/files", params={"path": sub1, "lang": "en"})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["evicted"] is False
+    assert payload["folder_assessment"] is not None
+    assert len(payload["files"]) == 1
+    f = payload["files"][0]
+    assert f["name"] == "file3.txt"
+    assert f["recommendation"] in ("safe_to_delete", "review_first")
+    assert f["confidence"] in ("high", "medium", "low")
+    assert f["impact"]
+    assert f["reason"] and f["reason"] != f["reason_key"]
+    assert "{" not in f["reason"]
+    assert f["deletable"]
+
+
+def test_folder_files_empty_folder_not_evicted(tmp_dir):
+    _scan_data(tmp_dir)
+    response = client.get("/api/folder/files", params={"path": os.path.join(tmp_dir, "sub2")})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["evicted"] is False
+    assert payload["files"] == []
+
+
+def test_folder_files_rejects_path_outside_scan_tree(tmp_dir):
+    _scan_data(tmp_dir)
+    response = client.get("/api/folder/files", params={"path": "C:\\Windows\\System32"})
+    assert response.status_code == 400
+
+
+def test_folder_files_localizes_for_es(tmp_dir):
+    _scan_data(tmp_dir, lang="es")
+    response = client.get("/api/folder/files", params={"path": os.path.join(tmp_dir, "sub1"), "lang": "es"})
+    assert response.status_code == 200
+    f = response.json()["files"][0]
+    assert f["reason"] != f["reason_key"]
+    # es localization differs from the raw en reason text for the same key
+    en = client.get("/api/folder/files", params={"path": os.path.join(tmp_dir, "sub1"), "lang": "en"}).json()["files"][0]
+    assert f["reason_key"] == en["reason_key"]
+    assert f["reason"] != en["reason"]
+
+
+def test_no_raw_reason_key_leaks_to_ui_surfaces(tmp_dir):
+    """Same audit discipline as Phase 6 CSV/HTML checks, applied to API rows:
+    any served ``reason`` must be non-raw localized text whose key is registered."""
+    reasons = client.get("/api/i18n", params={"lang": "en"}).json()["reasons"]
+    data = _scan_data(tmp_dir)
+    assessments = [data["root"]["assessment"]] + [t["assessment"] for t in data["top_folders"]]
+    files = client.get("/api/folder/files", params={"path": os.path.join(tmp_dir, "sub1")}).json()["files"]
+    for a in assessments:
+        if not a:
+            continue
+        assert a["reason_key"] in reasons
+        assert a["reason"] and a["reason"].strip() != a["reason_key"]
+        assert "{" not in a["reason"]
+    for f in files:
+        if not f["recommendation"]:
+            continue
+        assert f["reason_key"] in reasons
+        assert f["reason"] and f["reason"] != f["reason_key"]
+        assert "{" not in f["reason"]
+
+
+def test_i10_gating_rule_data_is_served_consistently(tmp_dir):
+    """I10 (item-vs-folder authority) must be implementable from served data:
+    the folder assessment and every file carry an independent recommendation,
+    and the UI's exact enable rule is mirrored here."""
+    data = _scan_data(tmp_dir)
+    top = data["top_folders"]
+    assert top, "fixture must yield at least one top folder"
+    assert all("recommendation" in t["assessment"] for t in top)
+
+    files = client.get("/api/folder/files", params={"path": os.path.join(tmp_dir, "sub1")}).json()["files"]
+    assert files, "sub1 holds retained records"
+
+    def ui_action_enabled(deletable, recommendation):
+        return bool(deletable and recommendation == "safe_to_delete")
+
+    # mirror of app.js isActionEnabled(): independent per-item authority.
+    assert ui_action_enabled(True, "safe_to_delete") is True     # file SAFE → actionable
+    assert ui_action_enabled(True, "review_first") is False      # folder REVIEW_FIRST → gated
+    assert ui_action_enabled(False, "safe_to_delete") is False   # protection guard always wins
+
+    for f in files:
+        assert "deletable" in f and "recommendation" in f
+    for t in top:
+        assert "deletable" in t and "recommendation" in t["assessment"]

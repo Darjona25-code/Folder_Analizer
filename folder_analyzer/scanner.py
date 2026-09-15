@@ -310,6 +310,16 @@ class Scanner:
             return records
         return self._rescan_folder_records(key)
 
+    def retained_records_for(self, folder_path: str) -> Tuple[FileEntry, ...]:
+        """Retained records for a folder with NO re-analysis (UI read path).
+
+        Never calls the classifier: evicted folders simply yield no records
+        (the caller should combine with :meth:`is_evicted` to show a
+        folder-level-only view). This upholds the zero-reclassification rule
+        for the Web UI (Phase 7).
+        """
+        return self._store.records_for_folder(os.path.normpath(folder_path))
+
     def is_evicted(self, folder_path: str) -> bool:
         """True when a scanned folder's retained records were all trimmed."""
         return self._store.was_evicted(os.path.normpath(folder_path))
