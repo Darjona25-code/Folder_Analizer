@@ -1,6 +1,6 @@
 # Folder Analyzer — Master Roadmap v3.0
 
-Status: **APPROVED — Phases 1–7 complete. Phase 7 (Web UI + single-source i18n migration) delivered and submitted for acceptance: single-source `locales/{en,es}.json` (ui + reasons namespaces) consumed by CLI/API/exports/Web UI, schema-v2 API surfaces, I10 folder/file gating, zero re-classification. All 6 verification points answered with evidence (2026-09-14, commit `09e38eb`: new HEAD benchmark side-by-side, I10 `rec`/`deletable` per-item proof, `retained_records_for` no-reanalyze test, `reason_params` interpolation through the real API→UI path, engine `git diff` clean except sanctioned `explain.py`). Suite 357 passed / 2 skipped. Pending formal acceptance before Phase 8 (Performance & Scale).**
+Status: **APPROVED — Phases 1–8 complete. Phase 8 (Performance & Scale) delivered: O1 single `_policy_for` + inlined bucket, O2 bounded per-folder filename verdict cache, core `ScanCancellation` wired to a `POST /api/scan/cancel` endpoint, reproducible benchmark harness (fixed `--affinity` mask, KB µs/file, cancel probe). Suite 369 passed / 2 skipped. Raw smoke `t_scan` 0.309–0.311 s (−13.6% same-mask vs Phase-7 state), export t_scan 0.3549 s (−7.6%), KB dispatch 2.4–2.7 µs/file, gate 0.26 MiB / 7,400 @ +0%, export bytes byte-identical, cancellation stops ≈8 ms after request. Evidence: ARCHITECTURE §6c + `benchmarks/results/smoke_p8_*.json`. Phase 7 (Web UI + single-source i18n) delivered and submitted for acceptance: single-source `locales/{en,es}.json` (ui + reasons namespaces) consumed by CLI/API/exports/Web UI, schema-v2 API surfaces, I10 folder/file gating, zero re-classification. All 6 verification points answered with evidence (2026-09-14, commit `09e38eb`: new HEAD benchmark side-by-side, I10 `rec`/`deletable` per-item proof, `retained_records_for` no-reanalyze test, `reason_params` interpolation through the real API→UI path, engine `git diff` clean except sanctioned `explain.py`). Pending formal acceptance before Phase 9 (Desktop Architecture & Prototype).**
 Version of this document: Phase 1 baseline commit.
 
 This is the implementation contract for the project. It is the single, internally
@@ -630,9 +630,17 @@ Fixed process (re-affirmed):
 - **Estimated effort:** 6–10 h. **Uncertainty:** Medium.
 
 ### Phase 8 — Performance & Scale
-- **Status: NOT STARTED — awaiting formal approval of Phase 7.** Carry-over: the
-  residual scan hot-path watch item (folder-prefix classification caching,
-  filename-only Tier-3 decisions; 50k fixture residual window) is Phase 8 work.
+- **Status: COMPLETE (delivered 2026-09-14).** Suite 369 passed / 2 skipped
+  (+12). Raw smoke `t_scan` 0.309–0.311 s / export 0.3549 s on the closed
+  run's fixed mask (0xc00) — **−13.6% / −7.6% vs the Phase-7 code state
+  re-measured on the same core pair** (archival mask 0x3 drifted; see
+  ARCHITECTURE §6c). KB dispatch 2.4–2.7 µs/file, classifier 2.1–2.3 µs/file
+  (Phase-5 close: 4.7). Gate alloc-peak 0.26 MiB + retained 7,400 @ +0%;
+  export output byte-identical (59,862 / 7,509 / 30,081 B). Cancellation
+  stops within **≈8 ms** of the request (partial `ScanResult.cancelled=True`).
+  Engine files touched: `scanner.py`, `classifier.py`, `models.py`,
+  `kb/__init__.py` (caching only) + `api/routes.py` cancel endpoint;
+  recommender/retention/safety/KB tier tables untouched.
 - **Objective:** reproducible benchmark suite (extends Phase 1 fixture/smoke) + optimization; cancellation responsiveness.
 - **Why:** scale targets must be measured.
 - **Dependencies:** Phase 5 (stable data pipeline); Phase 1 baseline.

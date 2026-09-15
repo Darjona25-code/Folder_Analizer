@@ -351,3 +351,58 @@ folder-analyzer --path C:\
   (full perf suite re-confirmed as a smoke benchmark here; the +445% Phase-5
   classification cost and unimplemented perf items stay Phase 8 scope). Do NOT
   begin Phase 8 without explicit approval.
+
+## Phase 8 — Performance & Scale (COMPLETED — delivered 2026-09-14)
+
+Approved by written charter: engine freeze LIFTED for this phase only for (a)
+folder-prefix classification caching and (b) filename-only Tier-3 fast paths;
+any other engine change out of bounds. Zero behavior change to outputs.
+
+- **Delivered:**
+  1. **O1 — `classifier.classify_scan` policy fast path:** `_policy_for` now
+     reads a precomputed `_POLICY_TABLE` + shared `_UNKNOWN_POLICY` (frozen
+     `CategoryPolicy`, value-safe) and the browser-marker bucket refinement is
+     inlined — the doubled `_policy_for` per file (also inside
+     `bucket_for_category`) is gone; public `bucket_for_category` unchanged.
+  2. **O2 — bounded per-folder filename verdict cache** (`kb/`): `ScanFolderContext`
+     gained `name_cache` (cap 256, enabled always); repeated names reuse the
+     tier-2/3/4 result with the per-file `path` re-materialized. Validity: tiers
+     2/3/4 verdicts depend only on folder parts + name; the tier-5 registry
+     fallback is deliberately NOT cached (per-file path semantics stay exact).
+     Proof: `tests/test_kb_cache.py` hits equal `kb.classify` for marker /
+     extension / app-tree / registry-fallback / unknown shapes; spy test shows
+     1 `classify_scan_name` call per distinct name, not per file.
+  3. **Cancellation (core → API):** `scanner.ScanCancellation` (thread-safe
+     event token, no FastAPI/Rich coupling), checked at folder granularity +
+     every 4096 files; cancelled scans return the partial tree with
+     `ScanResult.cancelled=True`; `POST /api/scan/cancel` wires the token via
+     `app.state.last_scan_cancellation`.
+  4. **Reproducible harness:** `run_smoke.py --affinity HEX` (explicit masked
+     pinning), `kb_dispatch_us_per_file` / `classifier_us_per_file`, `--cancel`
+     responsiveness probe; commands + noise band in `docs/ARCHITECTURE.md §7a`.
+- **P-core identity finding:** the probe-ranked "fastest pair" drifts by
+  machine state — Phase-5/6/7 rows were mask 0x3 (`[0,1]`); at Phase-8 close
+  the pair is 0xc00 (`[10,11]`, 0x3 now measures 2.1 s vs 0.311 s). Closing
+  comparisons are therefore SAME-MASK paired: Phase-7 state re-measured on
+  0xc00 = raw 0.36 s / export 0.3841 s.
+- **Benchmark (50k fixture, 0xc00, raw uninstrumented + gated):** smoke
+  `t_scan` **0.309–0.311 s (−13.6%)**, export `t_scan` **0.3549 s (−7.6%)**,
+  `t_fold` 0.424 ms; gate fold+export alloc-peak **0.26 MiB**, retained
+  **7,400 @ +0%**, export bytes **byte-identical** 59,862 / 7,509 / 30,081;
+  full-scan instrumented alloc-peak flat (12.88 vs 12.62–13.29 MiB). KB
+  classification **2.4–2.7 µs/file dispatch, 2.1–2.3 µs/file full classifier**
+  (Phase-5 close: 4.7 µs/file). Cancellation **≈8 ms to stop** after the
+  request at 100 ms (17,505/50,000 files, 13/37 folders).
+- **Suite:** 357 → **369 passed, 2 skipped** (+12: `test_kb_cache.py` +6,
+  `test_cancellation.py` +5, `test_file_analysis.py` retention-budget gate +1).
+- **Files changed:** `folder_analyzer/scanner.py`, `engine/classifier.py`,
+  `engine/models.py`, `engine/kb/__init__.py`, `api/routes.py`,
+  `benchmarks/run_smoke.py`, `tests/` (+2 new). Recommender / retention /
+  safety / enums / explain and the KB tier tables (categories/apps/env/
+  registry/content) untouched.
+- **Docs:** `docs/ARCHITECTURE.md` (status, module map, Phase 8 row + §6c
+  same-mask evidence + §7a commands), `docs/ROADMAP.md` (Phase 8 → COMPLETE),
+  `CHANGELOG.md` [Unreleased].
+- **Next:** awaits formal Phase 8 acceptance. Phase 9 — Desktop Architecture &
+  Prototype (PySide6; needs written approval). Do NOT begin Phase 9 without
+  it.

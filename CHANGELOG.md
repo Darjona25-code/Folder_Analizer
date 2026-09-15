@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Phase 8 — Performance & Scale)
+
+- **Hot-path optimization (engine):** `classifier.classify_scan` now calls
+  `_policy_for` once (precomputed `_POLICY_TABLE` + shared `_UNKNOWN_POLICY`
+  instance) and inlines the `browser`-marker bucket refinement, removing the
+  doubled `_policy_for` + per-file policy construction from the 50k-file path;
+  the public `bucket_for_category` is unchanged and remains the mapping truth.
+- **Folder-filename verdict cache (KB):** `ScanFolderContext` gained a bounded
+  256-entry `name_cache`; repeated filenames inside one folder reuse the
+  tier-2/3/4 verdict with the current per-file `path` re-materialized. The
+  tier-5 registry fallback stays uncached (per-file path semantics exact).
+  Cache validity: tiers 2/3/4 verdicts depend only on folder parts + file name
+  — proven byte-identical by `tests/test_kb_cache.py` vs `kb.classify` for
+  marker, extension, app-tree, registry-fallback and unknown verdict shapes.
+- **Scan cancellation (core → API):** `folder_analyzer/scanner.ScanCancellation`
+  (thread-safe event token, no framework coupling). `Scanner.scan` accepts it
+  and checks at folder granularity + every 4096 files; a cancelled scan returns
+  the partial tree and `ScanResult.cancelled=True` (never silently complete).
+  `POST /api/scan/cancel` (best-effort, idempotent) via
+  `app.state.last_scan_cancellation`. Responsiveness: **≈8 ms** to stop a 50k
+  scan after the cancel request (measured via `--cancel` probe).
+- **Reproducible benchmark harness:** `run_smoke.py` `--affinity HEX` pins an
+  explicit mask (skips the noisy P-core probe); new `kb_dispatch_us_per_file`
+  / `classifier_us_per_file` metrics; `--cancel`/`--cancel-after` cancellation
+  probe. Reference commands + noise band documented in ARCHITECTURE §7a.
+- **Tests (+12, suite 357 → 369):** `test_kb_cache.py` (cache parity + cache-
+  active proof + cache on t2-marker folders), `test_cancellation.py` (pre-
+  cancelled empty partial, mid-scan partial consistency, token-never-fires,
+  API cancel endpoint, no-token 400), retention-budget regression gate in
+  `test_file_analysis.py`.
+- **Benchmark results (50k fixture, `.affinity 0xc00` = cpus 10,11):** raw
+  smoke `t_scan` 0.309–0.311 s (−13.6% vs re-measured Phase-7 state on the
+  same pair), `run_export` `t_scan` 0.3549 s (−7.6%), KB dispatch 2.4–2.7
+  µs/file + classifier 2.1–2.3 µs/file (Phase-5 close: 4.7), gate fold+export
+  alloc-peak **0.26 MiB** + retained **7,400 @ +0%**, export output
+  **byte-identical** (59,862 / 7,509 / 30,081 B). Full-scan instrumented
+  alloc-peak flat (12.88 vs 12.62–13.29 MiB).
+- **Docs:** ARCHITECTURE (status, module map, Phase 8 benchmark row + §6c
+  same-mask evidence + §7a commands), SESSION, CHANGELOG.
+
 ### Added (Phase 7 — Web UI + Single-Source i18n Migration)
 
 - **Single-source i18n** (`folder_analyzer/locales/en.json` + `es.json`):
