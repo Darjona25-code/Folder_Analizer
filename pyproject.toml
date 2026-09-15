@@ -27,9 +27,13 @@ dependencies = [
 dev = [
     "pytest>=7.0",
 ]
+desktop = [
+    "PySide6>=6.6",
+]
 
 [project.scripts]
 folder-analyzer = "folder_analyzer.__main__:main"
+folder-analyzer-desktop = "desktop_app.__main__:main"
 
 [tool.setuptools.packages.find]
-include = ["folder_analyzer*"]
+include = ["folder_analyzer*", "desktop_app*"]

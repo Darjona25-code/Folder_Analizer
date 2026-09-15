@@ -1,0 +1,125 @@
+"""Desktop main window (PySide6). Thin view over DesktopController."""
+
+import os
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QToolBar,
+    QVBoxLayout,
+    QWidget,
+)
+
+from desktop_app.controller import DesktopController
+
+_COL_KEYS = (
+    "col_folder",
+    "col_size",
+    "col_files",
+    "col_recommendation",
+    "col_confidence",
+    "col_impact",
+    "col_reason",
+)
+
+
+class MainWindow(QMainWindow):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.controller = DesktopController()
+        self._build_ui()
+        self._retranslate()
+
+    def _build_ui(self):
+        self._toolbar = QToolBar(self)
+        self.addToolBar(self._toolbar)
+
+        self._pick_button = QPushButton(self)
+        self._toolbar.addWidget(self._pick_button)
+        self._pick_button.clicked.connect(self._pick_folder)
+
+        self._path_input = QLineEdit(self)
+        self._path_input.setMinimumWidth(320)
+        self._toolbar.addWidget(self._path_input)
+
+        self._lang_combo = QComboBox(self)
+        for code in ("en", "es"):
+            self._lang_combo.addItem(code.upper(), code)
+        self._toolbar.addWidget(self._lang_combo)
+        self._lang_combo.currentIndexChanged.connect(self._change_lang)
+
+        self._scan_button = QPushButton(self)
+        self._scan_button.setEnabled(False)
+        self._toolbar.addWidget(self._scan_button)
+
+        self._cancel_button = QPushButton(self)
+        self._cancel_button.setEnabled(False)
+        self._toolbar.addWidget(self._cancel_button)
+
+        self._delete_button = QPushButton(self)
+        self._delete_button.setEnabled(False)
+        self._toolbar.addWidget(self._delete_button)
+
+        central = QWidget(self)
+        layout = QVBoxLayout(central)
+
+        self._notice = QLabel(self)
+        self._notice.setWordWrap(True)
+        self._notice.setStyleSheet(
+            "color: #b00020; font-weight: bold; background: #fdecea; padding: 6px;"
+        )
+        self._notice.hide()
+        layout.addWidget(self._notice)
+
+        self._table = QTableWidget(0, len(_COL_KEYS), self)
+        self._table.setSelectionBehavior(QTableWidget.SelectRows)
+        self._table.setSelectionMode(QTableWidget.ExtendedSelection)
+        self._table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self._table.verticalHeader().setVisible(False)
+        self._table.horizontalHeader().setStretchLastSection(True)
+        self._table.setColumnWidth(0, 240)
+        self._table.setColumnWidth(1, 90)
+        self._table.setColumnWidth(2, 70)
+        layout.addWidget(self._table)
+
+        self.setCentralWidget(central)
+        self.resize(960, 520)
+
+    def _retranslate(self):
+        t = self.controller.t
+        self.setWindowTitle(t("app_title"))
+        self._pick_button.setText(t("desktop_pick_folder"))
+        self._path_input.setPlaceholderText(t("scan_placeholder"))
+        self._scan_button.setText(t("btn_scan"))
+        self._cancel_button.setText(t("btn_cancel"))
+        self._delete_button.setText(t("btn_recycle"))
+        self._table.setHorizontalHeaderLabels([t(key) for key in _COL_KEYS])
+        self.statusBar().showMessage(t("desktop_status_ready"))
+
+    def _pick_folder(self):
+        path = QFileDialog.getExistingDirectory(
+            self, self.controller.t("desktop_pick_folder")
+        )
+        if path:
+            self._path_input.setText(os.path.normpath(path))
+
+    def _change_lang(self):
+        code = self._lang_combo.currentData()
+        self.controller.set_lang(code)
+        self._retranslate()
+
+    def _set_notice(self, text: str | None):
+        if text:
+            self._notice.setText(text)
+            self._notice.show()
+        else:
+            self._notice.clear()
+            self._notice.hide()
