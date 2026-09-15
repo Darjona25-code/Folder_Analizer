@@ -607,6 +607,63 @@ td.files {
     justify-content: flex-end;
 }
 
+/* PHASE 7 — v2 assessment columns, files panel, I10 badges */
+.table-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-left: 16px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+td.reason {
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.rec-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.rec-safe {
+    color: var(--safe);
+    background: var(--safe-bg);
+}
+
+.rec-review {
+    color: var(--caution);
+    background: var(--caution-bg);
+}
+
+.rec-keep {
+    color: var(--text-muted);
+    background: rgba(95, 143, 159, 0.15);
+}
+
+.records-evicted {
+    background: var(--caution-bg);
+    color: var(--caution);
+    border: 1px solid var(--caution);
+    border-radius: var(--radius);
+    padding: 10px 16px;
+    margin: 12px 0;
+    font-size: 13px;
+}
+
+.scan-bar .dropdown-menu {
+    right: 0;
+}
+
 /* RESPONSIVE */
 @media (max-width: 768px) {
     .header {

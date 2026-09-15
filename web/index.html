@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Folder Analyzer - Caza Bytes</title>
+    <title id="pageTitle">Folder Analyzer - Caza Bytes</title>
     <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
     <link rel="stylesheet" href="/css/style.css">
 </head>
@@ -12,7 +12,7 @@
     <!-- SPLASH SCREEN -->
     <div class="splash" id="splash">
         <img src="/assets/CazaBytes.png" alt="Caza Bytes" class="splash-logo">
-        <div class="splash-title">Folder Analyzer</div>
+        <div class="splash-title" data-i18n="app_title">Folder Analyzer</div>
         <div class="splash-subtitle">by Caza Bytes</div>
         <div class="splash-spinner"></div>
     </div>
@@ -20,7 +20,7 @@
     <!-- LOADING OVERLAY -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner"></div>
-        <div class="loading-text" id="loadingText">Loading...</div>
+        <div class="loading-text" id="loadingText" data-i18n="loading">Loading...</div>
     </div>
 
     <!-- TOAST CONTAINER -->
@@ -29,11 +29,11 @@
     <!-- CONFIRM MODAL -->
     <div class="modal-overlay" id="confirmModal">
         <div class="modal">
-            <div class="modal-title">Confirm Deletion</div>
+            <div class="modal-title" id="confirmModalTitle" data-i18n="confirm_delete_title">Confirm Deletion</div>
             <div class="modal-body" id="confirmModalBody"></div>
             <div class="modal-actions">
-                <button class="btn btn-export" onclick="closeModal('confirmModal')">Cancel</button>
-                <button class="btn btn-danger" id="confirmDeleteBtn">Send to Recycle Bin</button>
+                <button class="btn btn-export" data-i18n="btn_cancel" id="confirmCancelBtn" onclick="closeModal('confirmModal')">Cancel</button>
+                <button class="btn btn-danger" data-i18n="btn_recycle" id="confirmDeleteBtn">Send to Recycle Bin</button>
             </div>
         </div>
     </div>
@@ -42,39 +42,39 @@
     <header class="header">
         <img src="/assets/CazaBytes.png" alt="Caza Bytes" class="header-logo">
         <div class="header-info">
-            <div class="header-title">Folder Analyzer</div>
+            <div class="header-title" data-i18n="app_title">Folder Analyzer</div>
             <div class="header-subtitle">by Caza Bytes</div>
         </div>
         <div class="header-stats">
             <div class="scan-stats">
                 <div class="stat-item">
-                    <div class="stat-label">Scanned Path</div>
+                    <div class="stat-label" data-i18n="stat_scanned_path">Scanned Path</div>
                     <div class="stat-value stat-path" id="scannedPath">&mdash;</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-label">Scanned total</div>
+                    <div class="stat-label" data-i18n="stat_scanned_total">Scanned total</div>
                     <div class="stat-value" id="scannedTotal">--</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-label">Files</div>
+                    <div class="stat-label" data-i18n="col_files">Files</div>
                     <div class="stat-value" id="scannedFiles">--</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-label">Folders</div>
+                    <div class="stat-label" data-i18n="folders_stat">Folders</div>
                     <div class="stat-value" id="scannedFolders">--</div>
                 </div>
             </div>
             <div class="disk-stats">
                 <div class="stat-item">
-                    <div class="stat-label">Disk</div>
+                    <div class="stat-label" data-i18n="disk_label">Disk</div>
                     <div class="stat-value" id="diskLabel">--</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-label">Used</div>
+                    <div class="stat-label" data-i18n="disk_used">Used</div>
                     <div class="stat-value" id="diskUsed">--</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-label">Free</div>
+                    <div class="stat-label" data-i18n="disk_free">Free</div>
                     <div class="stat-value" id="diskFree">--</div>
                 </div>
                 <div class="disk-bar">
@@ -89,14 +89,14 @@
 
         <!-- SCAN BAR -->
         <div class="scan-bar">
-            <input type="text" class="scan-input" id="scanInput" placeholder="Enter path to scan (e.g. C:\ or D:\Games)">
-            <button class="btn btn-primary" id="scanBtn">&#128269; Scan</button>
+            <input type="text" class="scan-input" id="scanInput" data-i18n-ph="scan_placeholder" placeholder="Enter a path to scan (e.g. C:\)">
+            <button class="btn btn-primary" data-i18n="btn_scan" id="scanBtn">Scan</button>
+            <button class="btn btn-export" data-i18n="btn_export" id="exportBtn">Export</button>
             <div class="dropdown">
-                <button class="btn btn-export" id="exportBtn">&#128229; Export</button>
-                <div class="dropdown-menu" id="exportMenu">
-                    <button class="dropdown-item" onclick="exportAs('json')">&#128196; JSON</button>
-                    <button class="dropdown-item" onclick="exportAs('csv')">&#128202; CSV</button>
-                    <button class="dropdown-item" onclick="exportAs('html')">&#127760; HTML</button>
+                <button class="btn btn-export" id="langBtn" title="Language">&#127760;</button>
+                <div class="dropdown-menu" id="langMenu">
+                    <button class="dropdown-item" data-lang="en" onclick="setLanguage('en')">English</button>
+                    <button class="dropdown-item" data-lang="es" onclick="setLanguage('es')">Español</button>
                 </div>
             </div>
         </div>
@@ -104,22 +104,26 @@
         <!-- TABLE -->
         <div class="table-container">
             <div class="table-header">
-                <div class="table-title">Disk Usage Analysis</div>
+                <div class="table-title" data-i18n="table_title">Disk Usage Analysis</div>
             </div>
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 50px">#</th>
-                        <th data-sort="name">Folder</th>
-                        <th data-sort="total_size" style="width: 130px; text-align: right">Size</th>
-                        <th data-sort="risk" style="width: 130px; text-align: center">Risk</th>
-                        <th data-sort="file_count" style="width: 100px; text-align: right">Files</th>
-                        <th style="width: 130px; text-align: center">Action</th>
+                        <th style="width: 50px" data-i18n="col_rank">#</th>
+                        <th data-sort="name" data-i18n="col_folder">Folder</th>
+                        <th data-sort="total_size" style="width: 130px; text-align: right" data-i18n="col_size">Size</th>
+                        <th data-sort="risk" style="width: 120px; text-align: center" data-i18n="col_risk">Risk</th>
+                        <th data-sort="rec" style="width: 120px; text-align: center" data-i18n="col_recommendation">Recommendation</th>
+                        <th data-sort="conf" style="width: 100px; text-align: center" data-i18n="col_confidence">Confidence</th>
+                        <th data-sort="impact" style="width: 100px; text-align: center" data-i18n="col_impact">Impact</th>
+                        <th style="min-width: 220px" data-i18n="col_reason">Reason</th>
+                        <th data-sort="file_count" style="width: 90px; text-align: right" data-i18n="col_files">Files</th>
+                        <th style="width: 130px; text-align: center" data-i18n="col_action">Action</th>
                     </tr>
                 </thead>
                 <tbody id="folderTableBody">
                     <tr>
-                        <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted)">
+                        <td colspan="10" style="text-align: center; padding: 40px; color: var(--text-muted)" data-i18n="empty_table_message">
                             Enter a path above and click Scan to analyze disk usage.
                         </td>
                     </tr>
@@ -127,9 +131,33 @@
             </table>
         </div>
 
+        <!-- FOLDER FILES PANEL -->
+        <div class="table-container" id="filesPanel" style="display: none;">
+            <div class="table-header">
+                <div class="table-title" id="filesPanelTitle">Files</div>
+                <div class="table-subtitle" id="filesPanelSummary"></div>
+            </div>
+            <div id="filesPanelNotice" class="records-evicted" style="display: none;"></div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 40px" data-i18n="col_rank">#</th>
+                        <th data-i18n="col_folder">File</th>
+                        <th data-sort="size" style="width: 130px; text-align: right" data-i18n="col_size">Size</th>
+                        <th style="width: 120px; text-align: center" data-i18n="col_recommendation">Recommendation</th>
+                        <th style="width: 100px; text-align: center" data-i18n="col_confidence">Confidence</th>
+                        <th style="width: 100px; text-align: center" data-i18n="col_impact">Impact</th>
+                        <th style="min-width: 220px" data-i18n="col_reason">Reason</th>
+                        <th style="width: 130px; text-align: center" data-i18n="col_action">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="filesTableBody"></tbody>
+            </table>
+        </div>
+
         <!-- TREEMAP -->
         <div class="treemap-container">
-            <div class="treemap-title">Disk Usage Distribution</div>
+            <div class="treemap-title" data-i18n="treemap_title">Disk Usage Distribution</div>
             <div id="treemapContent">
                 <p style="color: var(--text-muted)">Run a scan to see the disk usage treemap.</p>
             </div>
