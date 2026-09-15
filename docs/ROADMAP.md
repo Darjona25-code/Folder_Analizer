@@ -1,6 +1,6 @@
 # Folder Analyzer — Master Roadmap v3.0
 
-Status: **APPROVED — Phases 1–8 complete. Phase 8 (Performance & Scale) delivered and accepted in substance (2026-09-15; two pre-acceptance blockers closed in commits `552625b` + `dfce81e`): O1 single `_policy_for` + inlined bucket, O2 bounded per-folder filename verdict cache, core `ScanCancellation` wired to `POST /api/scan/cancel` and **surfaced end-to-end** (API `ScanResponse.cancelled`, CLI PARTIAL notice, additive v2 export markers, web UI localized notice), reproducible benchmark harness (fixed `--affinity` mask, KB µs/file, cancel probe). Suite **375 passed / 2 skipped** (369 delivery + 6 blocker tests). Raw smoke `t_scan` 0.309–0.311 s (−13.6% same-mask vs Phase-7 state), export t_scan 0.3549 s (−7.6%), KB dispatch 2.4–2.7 µs/file, gate 0.26 MiB / 7,400 @ +0%, export bytes byte-identical, cancellation stops ≈8 ms after request; the archival "2.1 s on mask 0x3" figure is **retracted** (ARCHITECTURE §6c dated correction: 0x3 re-measures 0.324–0.351 s at HEAD, no P-core identity drift). Evidence: ARCHITECTURE §6c + `benchmarks/results/smoke_p8_*.json`. Phase 7 (Web UI + single-source i18n) delivered and submitted for acceptance: single-source `locales/{en,es}.json` (ui + reasons namespaces) consumed by CLI/API/exports/Web UI, schema-v2 API surfaces, I10 folder/file gating, zero re-classification. All 6 verification points answered with evidence (2026-09-14, commit `09e38eb`: new HEAD benchmark side-by-side, I10 `rec`/`deletable` per-item proof, `retained_records_for` no-reanalyze test, `reason_params` interpolation through the real API→UI path, engine `git diff` clean except sanctioned `explain.py`). Phase 9 (Desktop Architecture & Prototype): **NOT STARTED — requires explicit written approval before any planning or implementation.****
+Status: **APPROVED — Phases 1–8 complete. Phase 8 (Performance & Scale) delivered and accepted in substance (2026-09-15; two pre-acceptance blockers closed in commits `552625b` + `dfce81e`): O1 single `_policy_for` + inlined bucket, O2 bounded per-folder filename verdict cache, core `ScanCancellation` wired to `POST /api/scan/cancel` and **surfaced end-to-end** (API `ScanResponse.cancelled`, CLI PARTIAL notice, additive v2 export markers, web UI localized notice), reproducible benchmark harness (fixed `--affinity` mask, KB µs/file, cancel probe). Suite **375 passed / 2 skipped** (369 delivery + 6 blocker tests). Raw smoke `t_scan` 0.309–0.311 s (−13.6% same-mask vs Phase-7 state), export t_scan 0.3549 s (−7.6%), KB dispatch 2.4–2.7 µs/file, gate 0.26 MiB / 7,400 @ +0%, export bytes byte-identical, cancellation stops ≈8 ms after request; the archival "2.1 s on mask 0x3" figure is **retracted** (ARCHITECTURE §6c dated correction: 0x3 re-measures 0.324–0.351 s at HEAD, no P-core identity drift). Evidence: ARCHITECTURE §6c + `benchmarks/results/smoke_p8_*.json`. Phase 7 (Web UI + single-source i18n) delivered and submitted for acceptance: single-source `locales/{en,es}.json` (ui + reasons namespaces) consumed by CLI/API/exports/Web UI, schema-v2 API surfaces, I10 folder/file gating, zero re-classification. All 6 verification points answered with evidence (2026-09-14, commit `09e38eb`: new HEAD benchmark side-by-side, I10 `rec`/`deletable` per-item proof, `retained_records_for` no-reanalyze test, `reason_params` interpolation through the real API→UI path, engine `git diff` clean except sanctioned `explain.py`). Phase 9 (Desktop Architecture & Prototype — PySide6 scaffold, ADR-001, core **in-process**, pick → scan → assessment table → gated delete, cancellation wired) **delivered and submitted for acceptance (2026-09-15)**; suite **384 passed / 2 skipped** (375 + 9 desktop tests: Qt-free controller units + offscreen smoke). Commits: `2ea97dd` (ADR) → `605bf90` (scaffold) → `59543e9` (in-process scan + assessment table) → `c130245` (gated delete + cancellation wiring) → `329d90b` (offscreen smoke + controller unit tests) → Phase 9 docs close. Proof: `docs/ADR-001-desktop-stack.md`, ARCHITECTURE §3c, quoted desktop tests, empty engine diff. **Awaits the user's explicit written approval; no next-phase work before it.**
 Version of this document: Phase 1 baseline commit.
 
 This is the implementation contract for the project. It is the single, internally
@@ -659,9 +659,10 @@ Fixed process (re-affirmed):
 - **Estimated effort:** 5–9 h. **Uncertainty:** Medium.
 
 ### Phase 9 — Desktop Architecture & Prototype
-- **Status: NOT STARTED — requires explicit written approval before any
-  planning or implementation (mandatory process rule).** The scope below is
-  the approved §18 roadmap definition; it is not a work authorization.
+- **Status: DELIVERED — submitted for acceptance (2026-09-15).** Scope below
+  was executed and evidence-packed (ADR-001 quoted, quoted desktop tests,
+  empty engine diff, before/after suite counts). Awaits the user's explicit
+  written approval before closure or any next-phase work.
 - **Objective:** PySide6 scaffold; ADR; core in-process; minimal app (pick → scan → assessment table → gated delete).
 - **Why:** validates desktop direction early; proves core without FastAPI.
 - **Dependencies:** Phase 8 (UX responsiveness baseline); approved PySide6.
@@ -670,7 +671,7 @@ Fixed process (re-affirmed):
 - **Tests:** headless Qt (offscreen) smoke + controller unit tests.
 - **Manual validation:** run prototype on real folder.
 - **Documentation:** ADR + ARCHITECTURE.md desktop section; CHANGELOG.
-- **Git strategy:** `feat(desktop): PySide6 prototype (Phase 9)`.
+- **Git strategy:** `docs(adr)`, `feat(desktop)` x3, `test(desktop)`, docs close.
 - **Acceptance criteria:** scans + assessments + gated delete; core in-process verified.
 - **Risks:** Qt offscreen quirks.
 - **Estimated effort:** 6–10 h. **Uncertainty:** Medium.

@@ -1,16 +1,15 @@
 # Folder Analyzer — Architecture
 
-Status: **Phase 8 — Performance & Scale** (hot-path optimization, cancellation
-surfaced end-to-end, reproducible benchmark harness) — delivered; both
-pre-acceptance blockers closed with dated corrections (2026-09-14; §6c +
-CHANGELOG/SESSION/ROADMAP). Phases 5 (recommendation engine + folder
-composition), 6 (Exports v2) and 7 (Web UI + single-source i18n) are
-closed/approved. Phase 8 awaits the user's formal written acceptance before
-any next-phase work. This document
-intentionally contains only the core/interface boundary, the current module map, the
-CLI/Web/Desktop relationship, and the benchmark table. Performance (Phase 8) and
-desktop (Phase 9/10) sections will be expanded in their respective phases; the
-locales/UI map is current as of Phase 8.
+Status: **Phase 9 — Desktop Architecture & Prototype** (PySide6 scaffold,
+ADR-001, core in-process, folder picker → scan → assessment table → gated
+delete, cancellation wired) — delivered and submitted for acceptance
+(2026-09-15). Phases 5 (recommendation engine + folder composition), 6
+(Exports v2), 7 (Web UI + single-source i18n) and 8 (Performance & Scale,
+pre-acceptance blockers closed 2026-09-14) are closed/approved. Phase 9
+awaits the user's formal written acceptance before any next-phase work. This
+document contains the core/interface boundary, the current module map, the
+CLI/Web/Desktop relationship, the desktop section (§3c), and the benchmark
+table.
 
 ---
 
@@ -62,6 +61,7 @@ Interfaces:
 | `folder_analyzer/exporter.py` | JSON/CSV/HTML export: v1 schema (backward compat) + **v2 (Phase 6, ScanResult-backed, deterministic, zero-reclassification; composition = full recursive aggregation)** | Core |
 | `api/` | FastAPI app (`main.py`) + routes (`routes.py`) + Pydantic models (`models.py`) — web adapter. Phase 7 surfaces: `/api/scan?lang=` (per-folder localized `AssessmentView` + recursive `composition`/`recursive_total`), `/api/i18n?lang=` (single-source `{ui, reasons}`), `/api/folder/files?path=&lang=` (retained records, `evicted` flag, zero re-classification). Phase 8: `POST /api/scan/cancel` (best-effort, idempotent token on `app.state.last_scan_cancellation`) | Interface |
 | `web/` | Static front-end (`index.html`, `js/app.js`, `css/style.css`): schema-v2 consumption (folder + per-file recommendation/confidence/impact/localized reason; drill-down panel; recursive total), locale-file lookups, I10 item-vs-folder gating (`isActionEnabled`), no raw `reason_key` rendered | Interface |
+| `desktop_app/` | **Phase 9 — PySide6 desktop prototype (Desktop-only dependency, ADR-001).** Consumes the core **in-process only** (no FastAPI server, no webview): `controller.py` (Qt-free — scan/rows/action gate/guarded delete, unit-testable headless), `worker.py` (`ScanWorker` QThread feeds results to the UI), `main_window.py` (picker → scan → assessment table → gated delete, language EN/ES, cancelled/partial notice). Deletion reuses `security_guard.validate_delete_target` + `revalidate` + `send2trash` (six-condition guard on every path); I10 gate = `deletable && recommendation == safe_to_delete` per folder; `ScanCancellation` token surfaced as an explicit PARTIAL notice | Interface |
 | `benchmarks/` | Fixture generator + smoke/export benchmarks (fixed baseline). Phase 8: `--affinity HEX` fixed-mask pinning (reproducible), KB µs/file measurement, `--cancel` cancellation-responsive probe | Tooling |
 | `tests/` | pytest suites | Tooling |
 
@@ -95,12 +95,42 @@ retention store via `Scanner.retained_records_for` (evicted folders report
 (`deletable && recommendation == "safe_to_delete"`) applied independently to folder
 bulk actions and to each file row.
 
+Phase 9 (interface layer only — **no engine/classifier/KB change**, same rule as
+Phase 7): the desktop app (`desktop_app/`, ADR-001) consumes the core **in-process**
+with **no** `Desktop → localhost FastAPI → Core` path and no embedded browser. The
+Qt-free `controller.py` mirrors the web `isActionEnabled` I10 gate as
+`action_enabled(assessment, deletable)` (folder rows use the folder's own derived
+assessment; item authority stays per-item), wraps every delete path in
+`validate_delete_target` + `revalidate` + `send2trash`, and passes a core
+`ScanCancellation` token through `Scanner.scan` so a cancelled scan is surfaced as an
+explicit PARTIAL notice — never as a silent success. i18n loads the same
+`locales/{en,es}.json` single-source files; `desktop_app/` adds three UI keys
+(`desktop_pick_folder`, `desktop_status_ready`, `desktop_delete_skipped`) in both
+languages. Desktop tests run headless under `QT_QPA_PLATFORM=offscreen` plus Qt-free
+controller unit tests (I10 gate, guarded delete, cancellation, i18n).
+
 ## 3. CLI / Web / Desktop relationship
 
 - All three interfaces expose the **same** core features (scan, analyze, export, gated
   delete); only presentation differs.
-- Deletion is gated by the **same** `security_guard` in CLI and API (and later Desktop),
+- Deletion is gated by the **same** `security_guard` in CLI and API (and Desktop),
   so no interface can bypass the deletion boundary.
+
+### 3c. Desktop app (Phase 9)
+
+- **Stack:** PySide6 (Qt6), Desktop-only optional dependency (`pyproject` extra
+  `desktop`), entry point `folder-analyzer-desktop` / `python -m desktop_app`.
+- **Process model:** in-process core only. `controller.py` never imports Qt (pure
+  unit tests); `worker.py` runs the core `Scanner` on a `QThread`; `main_window.py`
+  is a thin view (picker, path input, EN/ES language selector, Scan/Cancel/Recycle
+  Bin actions, assessment table, PARTIAL notice label).
+- **Delete path (every delete):** UI gate `row.action` → `QMessageBox` confirm →
+  `controller.delete_folders` → `validate_delete_target(scan_root)` → `revalidate`
+  → `send2trash`. Non-OK guard verdicts are never deleted.
+- **Row source:** descendants of the scan root only (the scanned root is never a
+  normal deletable row), sorted by size, with localized
+  recommendation/confidence/impact/reason from the scan-time `ScanResult`
+  (zero re-classification).
 
 ## 4. Scanner flow (current)
 

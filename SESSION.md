@@ -439,3 +439,43 @@ any other engine change out of bounds. Zero behavior change to outputs.
   two blocker commits (`552625b`, `dfce81e`); Phase 8 blockers closed; formal
   written acceptance pending; next phase **NOT STARTED** and must not begin
   without explicit written approval.
+
+## Phase 9 — Desktop Architecture & Prototype (delivered 2026-09-15, awaiting acceptance)
+
+- **Approval:** the user restated the charter, the assistant returned an exact
+  scope restatement (deliver / not-deliver / in-process rule / frozen-engine
+  rule / close-proof plan), and the user confirmed it and authorized Phase 9.
+- **ADR-001 (`docs/ADR-001-desktop-stack.md`, commit `2ea97dd`):** short record
+  of the approved PySide6 choice vs PyQt6 / Tkinter / Tauri/Electron
+  (ROADMAP §14), binding constraints: in-process core, no FastAPI/webview in
+  desktop, core stays Qt-free, i18n single-source, Desktop-only PySide6 extra.
+- **Prototype (commits `605bf90` scaffold, `59543e9` scan+table, `c130245`
+  gated delete+cancellation):** `desktop_app/` — Qt-free `controller.py`
+  (`scan`/`rows`/`action_enabled`/`delete_folders`), `worker.py` (`ScanWorker`
+  QThread), `main_window.py` (picker → scan → localized assessment table →
+  gated delete, EN/ES selector, PARTIAL notice). `pyproject.toml`:
+  `desktop = ["PySide6>=6.6"]` extra + `folder-analyzer-desktop` script.
+- **Safety invariants preserved:** every delete path = UI gate
+  (`deletable && recommendation == safe_to_delete` per folder) →
+  `validate_delete_target(scan_root)` → `revalidate` → `send2trash`; scan root
+  excluded from rows and never deletable; containment enforced; I10 holds (SAFE
+  `Data/cache` folder actionable beneath REVIEW_FIRST `Data`). Cancellation
+  token → core `Scanner.scan` → `ScanResult.cancelled` → visible PARTIAL
+  notice (never silent). i18n reuses `locales/{en,es}.json` (ui + reasons);
+  three new parity-kept UI keys (`desktop_pick_folder`,
+  `desktop_status_ready`, `desktop_delete_skipped`).
+- **Tests (commit `329d90b`):** Qt-free controller units (`test_desktop_controller.py`)
+  + offscreen Qt smoke (`test_desktop_smoke.py`, `QT_QPA_PLATFORM=offscreen`);
+  shared `mixed_sandbox` fixture added to `conftest.py`. Suite **375 → 384
+  passed, 2 skipped** (+9).
+- **Frozen engines:** `folder_analyzer/engine/` (recommender, retention,
+  safety, enums, explain, kb tables) and `folder_analyzer/classifier` untouched
+  — Phase 9 consumed `ScanResult`/`Scanner.scan`/`ScanResult.cancelled`/
+  `security_guard` read-only. Locale files gained only the three new UI keys
+  (parity test green).
+- **Manual validation:** prototype run offscreen against the real 50k
+  `benchmarks/generated/fixture` (36 rows populated, localized reason text,
+  `Scan complete: 42.33 GB across 50000 files`); GUI launch available via
+  `python -m desktop_app` (or the `folder-analyzer-desktop` console script).
+- **Status:** delivered and submitted for acceptance — awaiting the user's
+  explicit written approval; no next-phase work before it.

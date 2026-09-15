@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (2026-09-15 — Phase 9 Desktop Architecture & Prototype)
+
+- **ADR-001: PySide6 desktop stack** (`docs/ADR-001-desktop-stack.md`) — short
+  record of the already-approved choice (ROADMAP §14): PySide6 selected over
+  PyQt6 (GPL/commercial licensing), Tkinter (stdlib, limited) and
+  Tauri/Electron (web shell, heavier). Core stays UI-independent; PySide6 is a
+  Desktop-only optional dependency.
+- **Desktop app prototype (`desktop_app/`, core in-process only, no FastAPI):**
+  Qt-free `controller.py` (scan → localized assessment rows → I10 action gate →
+  guarded delete), `worker.py` (`ScanWorker` QThread over the core `Scanner`),
+  `main_window.py` (folder picker, path input, EN/ES language selector,
+  Scan/Cancel/Send-to-Recycle-Bin, assessment table with localized
+  recommendation / confidence / impact / reason / size / file count, explicit
+  PARTIAL notice on cancelled scans). Entry points: `folder-analyzer-desktop`
+  script + `python -m desktop_app`.
+- **Deletion path wraps the six-condition guard on every delete:**
+  `validate_delete_target(scan_root)` → `revalidate` → `send2trash`; the scan
+  root and anything outside it are never deletable; I10 gate
+  (`deletable && recommendation == safe_to_delete`) applied per folder, so a
+  SAFE folder under a REVIEW_FIRST parent stays individually actionable.
+- **PySide6 wired as optional extra:** `pyproject.toml` `desktop = ["PySide6>=6.6"]`.
+- **Tests +9 (suite 375 → 384 passed, 2 skipped):** Qt-free controller unit
+  tests (rows exclude scan root, I10 folder-gate, guarded delete via patched
+  `send2trash`, pre-cancelled partial, single-source i18n labels) + offscreen
+  Qt smoke tests (`QT_QPA_PLATFORM=offscreen`: window builds, scan populates
+  the table and gates delete by selection, cancelled scan shows the partial
+  notice). New shared fixture `mixed_sandbox` (SAFE cache folder under a
+  REVIEW_FIRST parent) in `tests/conftest.py`.
+
 ### Changed (2026-09-14 — Phase 8 close corrections, pre-acceptance blockers)
 
 - **Retracted: "mask 0x3 measures 2.1 s vs 0.311 s (P-core identity
