@@ -170,6 +170,7 @@ def scan_folder(req: ScanRequest, request: Request, lang: str = "en"):
         root=root_dict,
         stats=stats,
         top_folders=top_folders,
+        cancelled=scan_result.cancelled,
     )
 
 

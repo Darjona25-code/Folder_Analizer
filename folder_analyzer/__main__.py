@@ -10,7 +10,7 @@ from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, MofNCo
 from rich.prompt import Prompt
 from rich.panel import Panel
 
-from .scanner import Scanner, FolderInfo, sort_folders_by_size
+from .scanner import Scanner, FolderInfo, sort_folders_by_size, ScanCancellation
 from .reporter import show_top_folders, show_tree, show_folder_detail
 from .treemap import show_treemap
 from .deleter import delete_folders
@@ -59,7 +59,9 @@ def choose_path(i18n: I18n, console: Console) -> str:
     return path
 
 
-def do_scan(path: str, i18n: I18n, console: Console) -> tuple[FolderInfo, ScanResult]:
+def do_scan(path: str, i18n: I18n, console: Console,
+            cancellation: ScanCancellation | None = None,
+            ) -> tuple[FolderInfo, ScanResult]:
     scanner = Scanner(max_workers=16)
 
     with Progress(
@@ -74,11 +76,20 @@ def do_scan(path: str, i18n: I18n, console: Console) -> tuple[FolderInfo, ScanRe
         def on_progress(folders, files):
             progress.update(task, description=f"[cyan]{i18n.t('scanning', path=path)}[/cyan] | {folders:,} dirs | {files:,} files")
 
-        result = scanner.scan(path, on_progress=on_progress)
-        progress.update(task, completed=True, description=f"[green]{i18n.t('scan_complete')}[/green]")
+        result = scanner.scan(path, on_progress=on_progress, cancellation=cancellation)
+        if scanner.cancelled:
+            progress.update(task, completed=True,
+                            description=f"[yellow]{i18n.t('scan_cancelled')}[/yellow]")
+        else:
+            progress.update(task, completed=True,
+                            description=f"[green]{i18n.t('scan_complete')}[/green]")
 
     console.print(f"[green]{i18n.t('files_scanned', count=f'{scanner.scanned_files:,}')}[/green]")
     console.print(f"[green]{i18n.t('folders_scanned', count=f'{scanner.scanned_folders:,}')}[/green]")
+    if scanner.cancelled:
+        # A cancelled scan is NEVER presented with the success framing.
+        console.print(f"[bold yellow]{i18n.t('scan_cancelled')}[/bold yellow]")
+        console.print(f"[yellow]{i18n.t('scan_cancelled_detail', size=format_size(result.total_size), count=f'{result.file_count:,}')}[/yellow]")
     return result, scanner.scan_result()
 
 

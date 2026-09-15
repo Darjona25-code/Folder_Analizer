@@ -55,6 +55,7 @@ class ScanResponse(BaseModel):
     root: FolderDict
     stats: ScanStats
     top_folders: list[FolderDict]
+    cancelled: bool = False
 
 
 class DeleteRequest(BaseModel):

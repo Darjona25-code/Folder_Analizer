@@ -14,6 +14,7 @@ The v2 export functions must:
 """
 
 import csv
+import dataclasses
 import hashlib
 import html
 import inspect
@@ -98,6 +99,58 @@ def test_byte_identical_determinism(sandbox, fmt, fn):
     fn(root, I18n("en"), out2, scan_result, scan_date=_FIXED_SCAN_DATE)
     assert _digest(out1) == _digest(out2)
     assert os.path.getsize(out1) > 0
+
+
+def test_json_v2_cancelled_marker_additive_only(sandbox):
+    """A cancelled scan carries an explicit ``cancelled: true`` marker; a
+    complete scan stays WITHOUT the key entirely, so the v2 schema and the
+    byte-identical contract for normal scans are preserved."""
+    root, scan_result, _ = _scan(sandbox)
+
+    full_out = os.path.join(sandbox, "full.json")
+    exporter.export_json_v2(root, I18n("en"), full_out, scan_result, scan_date=_FIXED_SCAN_DATE)
+    with open(full_out, encoding="utf-8") as f:
+        full = json.load(f)
+    assert full["schema_version"] == 2
+    assert "cancelled" not in full
+
+    scan_result = dataclasses.replace(scan_result, cancelled=True)
+    cancelled_out = os.path.join(sandbox, "cancelled.json")
+    exporter.export_json_v2(root, I18n("en"), cancelled_out, scan_result, scan_date=_FIXED_SCAN_DATE)
+    with open(cancelled_out, encoding="utf-8") as f:
+        cancelled = json.load(f)
+    assert cancelled["schema_version"] == 2
+    assert cancelled["cancelled"] is True
+
+
+def test_csv_v2_cancelled_marker_row(sandbox):
+    root, scan_result, _ = _scan(sandbox)
+    scan_result = dataclasses.replace(scan_result, cancelled=True)
+    out = os.path.join(sandbox, "cancelled.csv")
+    exporter.export_csv_v2(root, I18n("en"), out, scan_result, scan_date=_FIXED_SCAN_DATE)
+    with open(out, newline="", encoding="utf-8") as f:
+        rows = list(csv.reader(f))
+    assert rows[0][0] == I18n("en").t("scan_cancelled")
+    assert rows[0][1] == I18n("en").t("scan_cancelled_detail")
+    assert rows[1][0] == "Folder"
+
+
+def test_html_v2_cancelled_banner_when_cancelled(sandbox):
+    root, scan_result, _ = _scan(sandbox)
+    scan_result = dataclasses.replace(scan_result, cancelled=True)
+    out = os.path.join(sandbox, "cancelled.html")
+    exporter.export_html_v2(root, I18n("en"), out, scan_result, scan_date=_FIXED_SCAN_DATE)
+    with open(out, encoding="utf-8") as f:
+        text = f.read()
+    assert I18n("en").t("scan_cancelled") in text
+    assert 'class="scan-cancelled"' in text
+
+    ok_result = dataclasses.replace(scan_result, cancelled=False)
+    ok_out = os.path.join(sandbox, "ok.html")
+    exporter.export_html_v2(root, I18n("en"), ok_out, ok_result, scan_date=_FIXED_SCAN_DATE)
+    with open(ok_out, encoding="utf-8") as f:
+        ok_text = f.read()
+    assert 'class="scan-cancelled"' not in ok_text
 
 
 def test_json_v2_schema_and_enrichment(sandbox):

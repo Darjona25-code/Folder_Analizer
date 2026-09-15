@@ -268,6 +268,10 @@ def export_json_v2(
         "inaccessible_count": scan_result.inaccessible_count,
         "folder_errors": list(scan_result.folder_errors),
     }
+    if scan_result.cancelled:
+        # Additive, optional marker: present ONLY when the scan was cancelled,
+        # so complete-scan output stays byte-identical and schema stays v2.
+        data["cancelled"] = True
     root_agg = scan_result.per_folder.get(os.path.normpath(root.path))
     data["root_assessment"] = _assessment_to_dict(
         root_agg.assessment if root_agg is not None else None
@@ -308,6 +312,9 @@ def export_csv_v2(
 
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
+        if scan_result.cancelled:
+            # Visible, localized marker line; present only for a cancelled scan.
+            writer.writerow([i18n.t("scan_cancelled"), i18n.t("scan_cancelled_detail")])
         writer.writerow([
             i18n.t("col_folder"),
             i18n.t("export_csv_size_bytes"),
@@ -435,10 +442,12 @@ def export_html_v2(
         .bar.critical {{ background: #f85149; }}
         .bar.caution {{ background: #d29922; }}
         .bar.safe {{ background: #3fb950; }}
+        .scan-cancelled {{ background: rgba(210, 153, 34, 0.12); border-left: 4px solid #d29922; color: #d29922; padding: 12px 16px; margin-bottom: 18px; border-radius: 6px; font-weight: 600; }}
     </style>
 </head>
 <body>
     <h1>{html.escape(i18n.t('app_title'))}</h1>
+    {f'<div class="scan-cancelled">{html.escape(i18n.t("scan_cancelled"))}</div>' if scan_result.cancelled else ''}
     <div class="meta">
         {html.escape(i18n.t('treemap_total', size=format_size(total)))} |
         {html.escape(i18n.t('files_count', count=f'{root.file_count:,}'))} | {html.escape(i18n.t('folders_count', count=f'{root.folder_count:,}'))} |

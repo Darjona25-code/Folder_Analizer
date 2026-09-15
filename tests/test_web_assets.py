@@ -90,3 +90,18 @@ def test_image_i10_rule_and_lookup_helpers_present():
 def test_stylesheet_has_phase7_badge_classes():
     for cls in [".rec-badge", ".rec-safe", ".rec-review", ".rec-keep", "td.reason", ".records-evicted", ".table-subtitle"]:
         assert cls in CSS, f"missing style for {cls}"
+
+
+def test_cancelled_notice_wired_into_frontend_and_styled():
+    """Blocker-1: the UI must render an explicit, localized PARTIAL-notice for
+    a cancelled scan — element, JS read of `cancelled`, i18n keys, and styles."""
+    assert 'id="scanCancelledNotice"' in INDEX
+    assert "currentData.cancelled" in APPJS
+    assert "t('scan_cancelled')" in APPJS
+    assert "t('scan_cancelled_detail'" in APPJS
+    assert ".scan-notice" in CSS
+    assert ".scan-cancelled" in CSS
+    assert "scan_cancelled" in _load_ui("en")
+    assert "scan_cancelled" in _load_ui("es")
+    assert "scan_cancelled_detail" in _load_ui("en")
+    assert "scan_cancelled_detail" in _load_ui("es")

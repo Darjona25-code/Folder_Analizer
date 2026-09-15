@@ -118,6 +118,8 @@
     "risk_caution": "PRECAUCION",
     "risk_critical": "CRITICO",
     "risk_safe": "SEGURO",
+    "scan_cancelled": "Analisis cancelado: los resultados son PARCIALES.",
+    "scan_cancelled_detail": "Detenido tras {size} en {count} archivos; el informe muestra solo las carpetas terminadas antes de la cancelacion.",
     "scan_complete": "Analisis completado!",
     "scan_complete_detail": "Escaneo completado: {size} en {count} archivos",
     "scan_error": "Error al analizar {path}: {error}",

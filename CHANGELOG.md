@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (2026-09-14 — Phase 8 close corrections, pre-acceptance blockers)
+
+- **Retracted: "mask 0x3 measures 2.1 s vs 0.311 s (P-core identity
+  drift)."** The archival figure from the Phase-8 close is not reproducible on
+  either mask. Corrected matrix (same 50k fixture, raw uninstrumented
+  `t_scan`): 09e38eb 0x3 = 0.425 / 0.412 s, HEAD 0x3 = 0.324 / 0.324 / 0.351 s,
+  09e38eb 0xc00 = 0.357 / 0.358 s (+1 outlier 0.486), HEAD 0xc00 = 0.308 /
+  0.337 s. Within each state the masks overlap inside the ~15–30% single-run
+  noise band; the same-mask −13.6% / −7.6% Phase-8 numbers are unaffected.
+  Canonical text: `docs/ARCHITECTURE.md §6c`.
+- **Cancellation surfaced end-to-end (charter constraint #3):** a cancelled
+  scan is never presented as complete on any surface. API `ScanResponse` now
+  carries `cancelled: bool`; the CLI announces an explicit localized PARTIAL
+  notice instead of the success framing; v2 exports gain a visible
+  cancellation marker (JSON `"cancelled": true` issued only when cancelled so
+  normal-scan output stays byte-identical at schema v2; CSV localized marker
+  row; HTML localized banner); the web UI renders a localized partial-notice
+  on scan completion. New locale keys `scan_cancelled` / `scan_cancelled_detail`
+  added to `en.json` and `es.json`.
+- **Tests +6 (suite 369 → 375 passed, 2 skipped):** API surfaces
+  `cancelled: true` in the scan response (concurrent cancel), JSON/CSV/HTML
+  v2 cancelled-markers, CLI PARTIAL announcement, web-assets notice wiring.
+
 ### Added (Phase 8 — Performance & Scale)
 
 - **Hot-path optimization (engine):** `classifier.classify_scan` now calls

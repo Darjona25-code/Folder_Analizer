@@ -118,6 +118,8 @@
     "risk_caution": "CAUTION",
     "risk_critical": "CRITICAL",
     "risk_safe": "SAFE",
+    "scan_cancelled": "Scan cancelled — results are PARTIAL.",
+    "scan_cancelled_detail": "Stopped after {size} across {count} files; the report shows only the folders finished before the cancel.",
     "scan_complete": "Scan complete!",
     "scan_complete_detail": "Scan complete: {size} across {count} files",
     "scan_error": "Error scanning {path}: {error}",

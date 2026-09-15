@@ -202,10 +202,14 @@ async function startScan() {
         currentFilesFolder = null;
         hideFilesPanel();
         renderAll();
-        showToast(t('scan_complete_detail', {
-            size: formatSize(currentData.stats.total_size),
-            count: currentData.stats.total_files.toLocaleString(),
-        }), 'success');
+        const cancelled = currentData.cancelled === true;
+        const message = cancelled
+            ? t('scan_cancelled')
+            : t('scan_complete_detail', {
+                size: formatSize(currentData.stats.total_size),
+                count: currentData.stats.total_files.toLocaleString(),
+            });
+        showToast(message, cancelled ? 'warning' : 'success');
     } catch (err) {
         showToast(t('scan_error_detail', { message: err.message }), 'error');
     } finally {
@@ -301,8 +305,23 @@ function renderAll() {
     if (!currentData) return;
 
     updateScannedStats(currentData.stats);
+    renderScanNotice();
     renderTable(currentData.top_folders);
     renderTreemap(currentData.top_folders);
+}
+
+function renderScanNotice() {
+    const el = document.getElementById('scanCancelledNotice');
+    if (!el) return;
+    if (currentData && currentData.cancelled) {
+        el.textContent = t('scan_cancelled') + ' ' + t('scan_cancelled_detail', {
+            size: formatSize(currentData.stats.total_size),
+            count: currentData.stats.total_files.toLocaleString(),
+        });
+        el.style.display = '';
+    } else {
+        el.style.display = 'none';
+    }
 }
 
 function updateScannedStats(stats) {

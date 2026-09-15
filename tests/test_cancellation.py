@@ -110,3 +110,39 @@ def test_api_scan_cancel_without_token(tmp_dir, monkeypatch):
     monkeypatch.setattr(app.state, "last_scan_cancellation", None, raising=False)
     response = client.post("/api/scan/cancel")
     assert response.status_code == 400
+
+
+def test_api_scan_response_surfaces_cancelled(scan_sandbox):
+    """Blocker-1: a scan cancelled mid-run must surface ``cancelled: true`` in
+    the /api/scan response alongside the partial stats — never a plain,
+    complete-looking payload that silently hides the cancellation."""
+    import asyncio
+
+    import httpx
+
+    _build_tree(scan_sandbox, n_subdirs=150, n_files=40)  # 6000 files
+    total = 150 * 40
+
+    async def _run():
+        # Clear any token a previous test left on server state so the poll
+        # below waits for THIS scan's fresh token, not a stale one.
+        app.state.last_scan_cancellation = None
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+            scan_task = asyncio.create_task(
+                ac.post("/api/scan", json={"path": scan_sandbox})
+            )
+            while getattr(app.state, "last_scan_cancellation", None) is None:
+                await asyncio.sleep(0.001)
+            cancel_resp = await ac.post("/api/scan/cancel")
+            scan_resp = await asyncio.wait_for(scan_task, timeout=20)
+            return cancel_resp, scan_resp, app.state.last_scan_cancellation
+
+    cancel_resp, scan_resp, token = asyncio.run(_run())
+    assert cancel_resp.status_code == 200
+    assert cancel_resp.json() == {"cancelled": True}
+    assert token.is_cancelled
+    assert scan_resp.status_code == 200
+    data = scan_resp.json()
+    assert data["cancelled"] is True
+    assert 0 <= data["stats"]["total_files"] <= total

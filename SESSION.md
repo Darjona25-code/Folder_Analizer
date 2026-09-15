@@ -380,11 +380,13 @@ any other engine change out of bounds. Zero behavior change to outputs.
   4. **Reproducible harness:** `run_smoke.py --affinity HEX` (explicit masked
      pinning), `kb_dispatch_us_per_file` / `classifier_us_per_file`, `--cancel`
      responsiveness probe; commands + noise band in `docs/ARCHITECTURE.md §7a`.
-- **P-core identity finding:** the probe-ranked "fastest pair" drifts by
-  machine state — Phase-5/6/7 rows were mask 0x3 (`[0,1]`); at Phase-8 close
-  the pair is 0xc00 (`[10,11]`, 0x3 now measures 2.1 s vs 0.311 s). Closing
-  comparisons are therefore SAME-MASK paired: Phase-7 state re-measured on
-  0xc00 = raw 0.36 s / export 0.3841 s.
+- **Core-selection note (corrected 2026-09-14):** the probe-ranked "fastest
+  pair" is machine-state dependent — Phase-5/6/7 rows were mask 0x3 (`[0,1]`);
+  at Phase-8 close the pair is 0xc00 (`[10,11]`). Closing comparisons are
+  therefore SAME-MASK paired: Phase-7 state re-measured on 0xc00 = raw 0.36 s /
+  export 0.3841 s. The original claim that mask 0x3 "now measures 2.1 s vs
+  0.311 s" is **retracted** (see corrections section below) — no P-core
+  identity drift exists; 0x3 at HEAD re-measures 0.324–0.351 s.
 - **Benchmark (50k fixture, 0xc00, raw uninstrumented + gated):** smoke
   `t_scan` **0.309–0.311 s (−13.6%)**, export `t_scan` **0.3549 s (−7.6%)**,
   `t_fold` 0.424 ms; gate fold+export alloc-peak **0.26 MiB**, retained
@@ -406,3 +408,19 @@ any other engine change out of bounds. Zero behavior change to outputs.
 - **Next:** awaits formal Phase 8 acceptance. Phase 9 — Desktop Architecture &
   Prototype (PySide6; needs written approval). Do NOT begin Phase 9 without
   it.
+
+## Corrections (2026-09-14) — post-close, pre-acceptance blockers
+
+- **Retracted: "mask 0x3 measures 2.1 s vs 0.311 s" (P-core identity
+  drift).** Direct re-measurement on the same 50k fixture through the same
+  harness shows the 2.1 s figure is not reproducible on either mask. Corrected
+  matrix (raw uninstrumented `t_scan`): 09e38eb 0x3 = 0.425 / 0.412 s, HEAD 0x3
+  = 0.324 / 0.324 / 0.351 s, 09e38eb 0xc00 = 0.357 / 0.358 s (+1 outlier 0.486),
+  HEAD 0xc00 = 0.308 / 0.337 s. Within each state the masks overlap inside the
+  ~15–30% single-run noise band; no sink is a core-placement property. The
+  same-mask −13.6% / −7.6% comparisons in the Phase-8 section above are
+  unaffected. Canonical text lives in `docs/ARCHITECTURE.md §6c`.
+- **Dated marker for Phase-8 acceptance:** suite 369 passed → **375 passed,
+  2 skipped** (+6 for the two blockers); cancellation is now surfaced end-to-end
+  (API `ScanResponse.cancelled`, CLI PARTIAL notice, additive export markers,
+  web UI localized notice) — see CHANGELOG correction entry.
