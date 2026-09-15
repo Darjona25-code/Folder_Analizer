@@ -187,6 +187,23 @@ def test_cap_zero_retains_nothing():
         _shutil_rmtree(tmpdir)
 
 
+def test_scan_result_retention_stays_within_budget():
+    """Phase 8 regression gate: the ScanResult never reports more retained
+    records than the configured global budget / per-folder cap."""
+    tmpdir = _make_tree(n_files=300, n_subdirs=0, content="x")
+    try:
+        scanner = Scanner(max_workers=2, retention=RetentionConfig(
+            global_budget=100, per_folder_cap=50))
+        scanner.scan(tmpdir)
+        result = scanner.scan_result()
+        assert result.records_retained <= 100
+        agg = result.per_folder[os.path.normpath(tmpdir)]
+        assert agg.records_retained <= 50
+        assert result.files_analyzed == 300  # budget never hides analyzed files
+    finally:
+        _shutil_rmtree(tmpdir)
+
+
 def test_largest_files_retained_before_smaller():
     tmpdir = _make_tree(n_files=10, n_subdirs=0)
     try:
