@@ -1,6 +1,6 @@
 # Folder Analyzer — Master Roadmap v3.0
 
-Status: **APPROVED — Phases 1–7 complete. Phase 7 (Web UI + single-source i18n migration) delivered and submitted for acceptance: single-source `locales/{en,es}.json` (ui + reasons namespaces) consumed by CLI/API/exports/Web UI, schema-v2 API surfaces, I10 folder/file gating, zero re-classification (suite 354 passed / 2 skipped, benchmark scan-side unchanged). Pending formal acceptance before Phase 8 (Performance & Scale).**
+Status: **APPROVED — Phases 1–7 complete. Phase 7 (Web UI + single-source i18n migration) delivered and submitted for acceptance: single-source `locales/{en,es}.json` (ui + reasons namespaces) consumed by CLI/API/exports/Web UI, schema-v2 API surfaces, I10 folder/file gating, zero re-classification. All 6 verification points answered with evidence (2026-09-14, commit `09e38eb`: new HEAD benchmark side-by-side, I10 `rec`/`deletable` per-item proof, `retained_records_for` no-reanalyze test, `reason_params` interpolation through the real API→UI path, engine `git diff` clean except sanctioned `explain.py`). Suite 357 passed / 2 skipped. Pending formal acceptance before Phase 8 (Performance & Scale).**
 Version of this document: Phase 1 baseline commit.
 
 This is the implementation contract for the project. It is the single, internally
@@ -600,18 +600,22 @@ Fixed process (re-affirmed):
 - **Estimated effort:** 4–7 h. **Uncertainty:** Low.
 
 ### Phase 7 — Web UI Adaptation + i18n
-- **Status: COMPLETE (2026-09-14, submitted for acceptance).** Single-source i18n
-  landed (`folder_analyzer/locales/{en,es}.json`, `ui` + `reasons` namespaces;
-  `i18n.py` + `explain.py` read the same files; `/api/i18n` serves them to the
-  browser — `fb7259a`). API v2 surfaces (`/api/scan?lang=` per-folder
-  `AssessmentView` + recursive composition, `/api/folder/files` retained-record
-  rows with `evicted` flag, zero re-classification via read-only
-  `Scanner.retained_records_for` — `d7988d6`). Schema-v2 Web UI with locale
-  lookups and I10 gating (`isActionEnabled`: REVIEW_FIRST folder bulk-delete
-  disabled; individually SAFE file actionable inside it) — `8e52976`. Suite
-  **354 passed, 2 skipped**; benchmark confirms **no scan-side impact**
-  (`t_fold` 0.492 ms, alloc 0.26 MiB, retained 7,400 @ +0%, byte-identical
-  export output).
+- **Status: COMPLETE — submitted for acceptance; all 6 verification points
+  answered with evidence (commit `09e38eb`, 2026-09-14):** new HEAD benchmark
+  side-by-side with Phase 6 (t_scan 0.448/0.434 s vs 0.470 s baseline, t_fold
+  0.480/0.585 ms, alloc 0.26 MiB, retained 7,400, byte-identical output); I10
+  `rec` proven per-row in separate render functions + `deletable` proven a pure
+  per-path guard not inherited from the folder verdict
+  (`test_i10_safe_file_inside_review_first_folder_is_actionable`); new
+  `retained_records_for` method (no-rename) with
+  `test_retained_records_for_never_reanalyzes` (0 scandir / 0 classify on
+  eviction, contrast `records_for` still re-scans);
+  `test_api_serves_interpolated_reason_params` proves `{params}` interpolation
+  through the real scan→API→UI path (r3_unknown, "100.0%", no `{`/`}`, ES
+  parity); engine `git diff 445738a..69126c2` shows only the sanctioned
+  `explain.py` re-export (classifier/recommender/kb/models/enums/retention:
+  empty). Suite **357 passed, 2 skipped**; benchmark confirms **no scan-side
+  impact**. Awaiting formal acceptance.
 - **Objective:** web assessment columns + explanations; delete gating matrix; single-source i18n migration.
 - **Why:** web must represent the safety model truthfully.
 - **Dependencies:** Phases 5, 6; decisions D2 (i18n) and D3 (API/Web optional) approved.
@@ -626,6 +630,9 @@ Fixed process (re-affirmed):
 - **Estimated effort:** 6–10 h. **Uncertainty:** Medium.
 
 ### Phase 8 — Performance & Scale
+- **Status: NOT STARTED — awaiting formal approval of Phase 7.** Carry-over: the
+  residual scan hot-path watch item (folder-prefix classification caching,
+  filename-only Tier-3 decisions; 50k fixture residual window) is Phase 8 work.
 - **Objective:** reproducible benchmark suite (extends Phase 1 fixture/smoke) + optimization; cancellation responsiveness.
 - **Why:** scale targets must be measured.
 - **Dependencies:** Phase 5 (stable data pipeline); Phase 1 baseline.
