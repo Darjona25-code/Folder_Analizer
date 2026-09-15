@@ -14,6 +14,10 @@ Corrected methodology (Phase 5, benchmark tooling only):
   (``SetProcessAffinityMask`` / ``os.sched_setaffinity``). After the run the
   original affinity is restored in the parent process; subprocess-invoked runs
   exit anyway.
+- **Fixed affinity (Phase 8).** ``--affinity 0x3`` pins an explicit mask and
+  skips the probe, so closing numbers are reproducible across machines and
+  unambiguously comparable to the documented baseline (reference machine:
+  mask ``0x3`` = P-cores 0, 1). The probe remains the convenience default.
 - **Gate metrics.** The deterministic, code-attributable regression metrics
   are ``python_alloc_peak_mib`` (tracemalloc alloc peak) and
   ``retained_records``. Peak RSS remains reported as an *envelope* metric only
@@ -28,7 +32,13 @@ Metrics recorded:
 - analysis/composition time (filled by later phases)
 - gate: python alloc peak (MiB) + retained records
 - peak memory envelope (MiB, max RSS delta during scan)
-- cancellation responsiveness (Phase 1: n/a; filled by Phase 8)
+- kb classification cost (Phase 8): ``*_us_per_file`` for the raw tier
+  dispatch (``classify_scan_path``) and the full ``classify_scan`` else
+  (policy/bucket/record assembly), measured over every fixture file with one
+  ``ScanFolderContext`` per parent folder (the real scan shape)
+- cancellation responsiveness (Phase 8): stop delay of a fresh scan cancelled
+  ``--cancel-after`` seconds in (default 0.10), plus the file/folder counts
+  reached at stop; only when ``--cancel`` is given
 
 Regression gate: a >20% regression versus the baseline in docs/ARCHITECTURE.md
 is a phase-closing gate (see docs/ROADMAP.md §15/§22), evaluated on the gate
@@ -37,6 +47,7 @@ metrics above, not on RSS.
 Usage:
     python benchmarks/gen_fixture.py --out benchmarks/generated/fixture
     python benchmarks/run_smoke.py --path benchmarks/generated/fixture --json benchmarks/results/smoke.json
+    python benchmarks/run_smoke.py --path benchmarks/generated/fixture --affinity 0x3 --cancel --json benchmarks/results/smoke_p8.json
 """
 
 from __future__ import annotations
@@ -154,10 +165,16 @@ def run_smoke(
     pinned: bool = True,
     pinned_cores: int = 2,
     trace_alloc: bool = True,
+    affinity_mask: "int | None" = None,
+    cancel_after_s: "float | None" = None,
 ) -> dict:
-    affinity_mask = 0
+    applied_mask = 0
     if pinned:
-        affinity_mask = pin_to_fast_cores(pinned_cores)
+        if affinity_mask is not None:
+            _set_affinity(affinity_mask)
+            applied_mask = affinity_mask
+        else:
+            applied_mask = pin_to_fast_cores(pinned_cores)
         max_workers = min(max_workers, pinned_cores)
     scanner = Scanner(max_workers=max_workers)
 
@@ -194,6 +211,14 @@ def run_smoke(
     folders = scanner.scanned_folders
     files_per_second = round(files / elapsed, 1) if elapsed > 0 else 0.0
 
+    kb = measure_kb_classify(path)
+    cancellation = None
+    if cancel_after_s is not None:
+        cancellation = run_cancellation_probe(
+            path, cancel_after_s=cancel_after_s,
+            max_workers=max(1, min(max_workers, pinned_cores)),
+        )
+
     return {
         "path": os.path.abspath(path),
         "environment": {
@@ -202,11 +227,11 @@ def run_smoke(
             "platform": __import__("platform").platform(),
         },
         "affinity": {
-            "pinned": bool(affinity_mask),
-            "mask": hex(affinity_mask) if affinity_mask else None,
+            "pinned": bool(applied_mask),
+            "mask": hex(applied_mask) if applied_mask else None,
             "cpus": sorted(
-                c for c in range(64) if affinity_mask & (1 << c)
-            ) if affinity_mask else None,
+                c for c in range(64) if applied_mask & (1 << c)
+            ) if applied_mask else None,
         },
         "total_scan_time_s": round(elapsed, 3),
         "files_per_second": files_per_second,
@@ -227,7 +252,93 @@ def run_smoke(
                 "retained_records; RSS is an informational envelope only"
             ),
         },
-        "cancellation_responsiveness_ms": None,
+        "kb_classify": kb,
+        "cancellation": cancellation,
+        "cancellation_responsiveness_ms": (
+            cancellation["stop_delay_ms"] if cancellation is not None else None
+        ),
+    }
+
+
+def measure_kb_classify(path: str) -> dict:
+    """Per-file classification cost over the fixture (workers=1, no timers).
+
+    Methodology: walk the fixture, prepare one ``ScanFolderContext`` per parent
+    folder (exactly the real scan shape, so the Phase-8 filename cache is
+    active), then time ONLY the dispatch across every file sequentially:
+
+    - ``kb_dispatch_us_per_file``: ``classify_scan_path`` (raw tier dispatch),
+    - ``classifier_us_per_file``: ``classify_scan`` (dispatch + policy/bucket/
+      record assembly).
+
+    These are the per-file numbers comparable to the Phase-5 close's
+    ``~4.7 us/file`` classification figure, run with tracemalloc OFF so the
+    headline cost stays uninstrumented.
+    """
+    from folder_analyzer.engine import classifier
+    from folder_analyzer.engine.kb import classify_scan_path, prepare_scan_folder
+    from folder_analyzer.engine.kb._norm import norm
+
+    samples = []
+    for dirpath, _dirs, fnames in os.walk(path):
+        ctx = prepare_scan_folder(dirpath)
+        for name in fnames:
+            samples.append((ctx, os.path.join(dirpath, name), name))
+    n = len(samples)
+    if n == 0:
+        return {
+            "kb_dispatch_total_s": 0.0,
+            "kb_dispatch_us_per_file": 0.0,
+            "classifier_total_s": 0.0,
+            "classifier_us_per_file": 0.0,
+        }
+
+    t0 = time.perf_counter()
+    for ctx, full, name in samples:
+        classify_scan_path(ctx, file_key=norm(full), file_name=name)
+    kb_elapsed = time.perf_counter() - t0
+
+    t0 = time.perf_counter()
+    for ctx, full, name in samples:
+        classifier.classify_scan(full, filename=name, _ctx=ctx)
+    classifier_elapsed = time.perf_counter() - t0
+
+    return {
+        "kb_dispatch_total_s": round(kb_elapsed, 4),
+        "kb_dispatch_us_per_file": round(kb_elapsed * 1e6 / n, 3),
+        "classifier_total_s": round(classifier_elapsed, 4),
+        "classifier_us_per_file": round(classifier_elapsed * 1e6 / n, 3),
+    }
+
+
+def run_cancellation_probe(path: str, cancel_after_s: float = 0.10,
+                           max_workers: int = 2) -> dict:
+    """Cancel a fresh scan ``cancel_after_s`` in and measure the stop delay.
+
+    Folder-granularity cancellation: the bound is the time to finish the
+    folder(s) already in flight when the token fires (plus scheduling), so
+    ``stop_delay_ms`` is the honest responsiveness number. ``cancelled`` marks
+    whether the token actually fired before the scan finished on its own; on a
+    machine fast enough to finish first, ``stop_delay_ms`` is the full-scan
+    time and ``cancelled`` is False (no token was needed).
+    """
+    from folder_analyzer.scanner import ScanCancellation
+
+    token = ScanCancellation()
+    timer = threading.Timer(cancel_after_s, token.cancel)
+    start = time.perf_counter()
+    timer.start()
+    scanner = Scanner(max_workers=max_workers)
+    scanner.scan(path, cancellation=token)
+    elapsed = time.perf_counter() - start
+    timer.join()
+    return {
+        "cancel_after_s": cancel_after_s,
+        "cancelled": scanner.cancelled,
+        "stop_delay_ms": round(elapsed * 1000, 2),
+        "scanned_files_at_stop": scanner.scanned_files,
+        "scanned_folders_at_stop": scanner.scanned_folders,
+        "retained_records_at_stop": scanner.records_retained,
     }
 
 
@@ -244,7 +355,24 @@ def main() -> None:
                         help="Disable allocation tracing: plain wall-clock timing "
                              "(no python_alloc_peak metric) — use for uninstrumented "
                              "cost measurement")
+    parser.add_argument("--affinity", default=None,
+                        help="Fixed affinity mask in hex (e.g. 0x3) to pin to, "
+                             "skipping the P-core probe. Use for reproducible "
+                             "phase-over-phase closing runs; the reference machine "
+                             "baseline is 0x3 (CPU 0, 1).")
+    parser.add_argument("--cancel", action="store_true",
+                        help="Also run the cancellation responsiveness probe "
+                             "(a fresh scan cancelled 100ms in)")
+    parser.add_argument("--cancel-after", type=float, default=0.10,
+                        help="Cancel delay in seconds for the --cancel probe")
     args = parser.parse_args()
+
+    affinity_mask = None
+    if args.affinity:
+        try:
+            affinity_mask = int(args.affinity, 16)
+        except ValueError:
+            parser.error(f"--affinity must be a hex mask, got {args.affinity!r}")
 
     result = run_smoke(
         args.path,
@@ -252,6 +380,8 @@ def main() -> None:
         pinned=not args.no_pin,
         pinned_cores=args.pinned_cores,
         trace_alloc=not args.no_tracemalloc,
+        affinity_mask=affinity_mask,
+        cancel_after_s=args.cancel_after if args.cancel else None,
     )
 
     header = (
@@ -268,6 +398,8 @@ def main() -> None:
         ("GATE: alloc peak (MiB)", result["python_alloc_peak_mib"]),
         ("GATE: retained records", result["retained_records"]),
         ("envelope: RSS (MiB)", result["peak_memory_mib"]),
+        ("KB dispatch (us/file)", result["kb_classify"]["kb_dispatch_us_per_file"]),
+        ("classifier (us/file)", result["kb_classify"]["classifier_us_per_file"]),
         ("cancellation (ms)", result["cancellation_responsiveness_ms"]),
     ]
     print(f"SMOKE BENCHMARK - {result['path']}")
