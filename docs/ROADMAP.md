@@ -1,6 +1,6 @@
 # Folder Analyzer — Master Roadmap v3.0
 
-Status: **APPROVED — Phases 1–8 complete. Phase 8 (Performance & Scale) delivered and accepted in substance (2026-09-15; two pre-acceptance blockers closed in commits `552625b` + `dfce81e`): O1 single `_policy_for` + inlined bucket, O2 bounded per-folder filename verdict cache, core `ScanCancellation` wired to `POST /api/scan/cancel` and **surfaced end-to-end** (API `ScanResponse.cancelled`, CLI PARTIAL notice, additive v2 export markers, web UI localized notice), reproducible benchmark harness (fixed `--affinity` mask, KB µs/file, cancel probe). Suite **375 passed / 2 skipped** (369 delivery + 6 blocker tests). Raw smoke `t_scan` 0.309–0.311 s (−13.6% same-mask vs Phase-7 state), export t_scan 0.3549 s (−7.6%), KB dispatch 2.4–2.7 µs/file, gate 0.26 MiB / 7,400 @ +0%, export bytes byte-identical, cancellation stops ≈8 ms after request; the archival "2.1 s on mask 0x3" figure is **retracted** (ARCHITECTURE §6c dated correction: 0x3 re-measures 0.324–0.351 s at HEAD, no P-core identity drift). Evidence: ARCHITECTURE §6c + `benchmarks/results/smoke_p8_*.json`. Phase 7 (Web UI + single-source i18n) delivered and submitted for acceptance: single-source `locales/{en,es}.json` (ui + reasons namespaces) consumed by CLI/API/exports/Web UI, schema-v2 API surfaces, I10 folder/file gating, zero re-classification. All 6 verification points answered with evidence (2026-09-14, commit `09e38eb`: new HEAD benchmark side-by-side, I10 `rec`/`deletable` per-item proof, `retained_records_for` no-reanalyze test, `reason_params` interpolation through the real API→UI path, engine `git diff` clean except sanctioned `explain.py`). Phase 9 (Desktop Architecture & Prototype — PySide6 scaffold, ADR-001, core **in-process**, pick → scan → assessment table → gated delete, cancellation wired) **delivered and submitted for acceptance (2026-09-15)**; suite **384 passed / 2 skipped** (375 + 9 desktop tests: Qt-free controller units + offscreen smoke). Commits: `2ea97dd` (ADR) → `605bf90` (scaffold) → `59543e9` (in-process scan + assessment table) → `c130245` (gated delete + cancellation wiring) → `329d90b` (offscreen smoke + controller unit tests) → Phase 9 docs close. Proof: `docs/ADR-001-desktop-stack.md`, ARCHITECTURE §3c, quoted desktop tests, empty engine diff. **Awaits the user's explicit written approval; no next-phase work before it.**
+Status: **APPROVED — Phases 1–8 complete. Phase 8 (Performance & Scale) delivered and accepted in substance (2026-09-15; two pre-acceptance blockers closed in commits `552625b` + `dfce81e`): O1 single `_policy_for` + inlined bucket, O2 bounded per-folder filename verdict cache, core `ScanCancellation` wired to `POST /api/scan/cancel` and **surfaced end-to-end** (API `ScanResponse.cancelled`, CLI PARTIAL notice, additive v2 export markers, web UI localized notice), reproducible benchmark harness (fixed `--affinity` mask, KB µs/file, cancel probe). Suite **375 passed / 2 skipped** (369 delivery + 6 blocker tests). Raw smoke `t_scan` 0.309–0.311 s (−13.6% same-mask vs Phase-7 state), export t_scan 0.3549 s (−7.6%), KB dispatch 2.4–2.7 µs/file, gate 0.26 MiB / 7,400 @ +0%, export bytes byte-identical, cancellation stops ≈8 ms after request; the archival "2.1 s on mask 0x3" figure is **retracted** (ARCHITECTURE §6c dated correction: 0x3 re-measures 0.324–0.351 s at HEAD, no P-core identity drift). Evidence: ARCHITECTURE §6c + `benchmarks/results/smoke_p8_*.json`. Phase 7 (Web UI + single-source i18n) delivered and submitted for acceptance: single-source `locales/{en,es}.json` (ui + reasons namespaces) consumed by CLI/API/exports/Web UI, schema-v2 API surfaces, I10 folder/file gating, zero re-classification. All 6 verification points answered with evidence (2026-09-14, commit `09e38eb`: new HEAD benchmark side-by-side, I10 `rec`/`deletable` per-item proof, `retained_records_for` no-reanalyze test, `reason_params` interpolation through the real API→UI path, engine `git diff` clean except sanctioned `explain.py`). Phase 9 (Desktop Architecture & Prototype — PySide6 scaffold, ADR-001, core **in-process**, pick → scan → assessment table → gated delete, cancellation wired) **delivered and submitted for acceptance (2026-09-15)**; suite **384 passed / 2 skipped** (375 + 9 desktop tests: Qt-free controller units + offscreen smoke). Commits: `2ea97dd` (ADR) → `605bf90` (scaffold) → `59543e9` (in-process scan + assessment table) → `c130245` (gated delete + cancellation wiring) → `329d90b` (offscreen smoke + controller unit tests) → Phase 9 docs close. Proof: `docs/ADR-001-desktop-stack.md`, ARCHITECTURE §3c, quoted desktop tests, empty engine diff. **Awaits the user's explicit written approval; no next-phase work before it.** Remaining phases after Phase 9 (all NOT STARTED, requiring explicit written approval): Phase 10 (Desktop Application Complete) → Phase 11 (Packaging & Installer) → Phase 12 (Final Integration, QA & Portfolio Cleanup).
 Version of this document: Phase 1 baseline commit.
 
 This is the implementation contract for the project. It is the single, internally
@@ -448,6 +448,25 @@ Fixed process (re-affirmed):
 
 > Each phase is implementation-ready. Estimates reconcile to §25.
 
+### Phase status (current)
+
+| Phase | Status |
+|---|---|
+| 1 — Deletion Security Hardening + Safety Boundary | COMPLETE / APPROVED |
+| 2 — Safety Engine Model (three-axis enums + invariant guards) | COMPLETE / APPROVED |
+| 3 — File Analysis & Data Model (metadata + bounded retention) | COMPLETE / APPROVED |
+| 4 — Knowledge Base (tiered, offline) | COMPLETE / APPROVED |
+| 5 — Recommendation Engine + Folder Composition | COMPLETE / APPROVED |
+| 6 — Exports v2 (ScanResult-backed, byte-identical, zero re-classification) | COMPLETE / APPROVED |
+| 7 — Web UI + single-source i18n | COMPLETE / APPROVED |
+| 8 — Performance & Scale (hot-path optimization, cancellation end-to-end) | COMPLETE (re-close accepted in substance 2026-09-15) |
+| 9 — Desktop Architecture & Prototype (PySide6, ADR-001, in-process core) | **DELIVERED — awaiting formal written approval (2026-09-15)** |
+| 10 — Desktop Application Complete (drill-down, settings, full parity) | NOT STARTED |
+| 11 — Packaging & Installer (PyInstaller bundle, wheel) | NOT STARTED |
+| 12 — Final Integration, QA & Portfolio Cleanup | NOT STARTED |
+
+Phases 1–8 are complete and approved. Phase 9 is delivered and pending the user's explicit written approval before closure. Only Phases 10, 11 and 12 remain — none may be started until Phase 9 is formally approved.
+
 ### Phase 1 — Deletion Security Hardening + Safety Boundary
 - **Objective:** six-condition canonical containment guard in core, API, CLI; protected-path policy; reparse safety; final revalidation.
 - **Why:** current `deleter.py` uses `normpath` only — containment/root/ancestor/reparse escapes possible; all later delete UIs depend on this boundary.
@@ -677,6 +696,7 @@ Fixed process (re-affirmed):
 - **Estimated effort:** 6–10 h. **Uncertainty:** Medium.
 
 ### Phase 10 — Desktop Application Complete
+- **Status: NOT STARTED — requires explicit written approval before any planning or implementation (mandatory process rule).** Dependencies: Phase 9 (delivered; acceptance pending). Only remaining phases after Phase 9.
 - **Objective:** full desktop: drill-down, reasons panel, export, settings, i18n, cancellation.
 - **Why:** primary product surface; feature parity with web.
 - **Dependencies:** Phase 9.
@@ -691,6 +711,7 @@ Fixed process (re-affirmed):
 - **Estimated effort:** 8–14 h. **Uncertainty:** High.
 
 ### Phase 11 — Packaging & Installer
+- **Status: NOT STARTED — requires explicit written approval before any planning or implementation (mandatory process rule).** Dependencies: Phase 10.
 - **Objective:** PyInstaller bundle + optional installer; wheel remains; finalize v3.0.0.
 - **Why:** desktop requires end-user distribution.
 - **Dependencies:** Phase 10; decision D1 (versioning).
@@ -705,6 +726,7 @@ Fixed process (re-affirmed):
 - **Estimated effort:** 5–9 h. **Uncertainty:** High.
 
 ### Phase 12 — Final Integration, QA & Portfolio Cleanup
+- **Status: NOT STARTED — requires explicit written approval before any planning or implementation (mandatory process rule).** Dependencies: all prior phases (1–11). Final phase.
 - **Objective:** E2E verification across CLI/Web/Desktop; docs reconciliation; threshold revalidation; scratch cleanup; release tag.
 - **Why:** ship a coherent, trustworthy v3.0.0.
 - **Dependencies:** all phases.
