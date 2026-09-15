@@ -225,19 +225,24 @@ _DISPOSABLE_MARKERS: "frozenset[str]" = frozenset({
 })
 
 
+_UNKNOWN_POLICY = CategoryPolicy(
+    CompositionBucket.UNKNOWN, SystemImpact.UNKNOWN,
+    ConfidenceLevel.LOW, DeletionRecommendation.REVIEW_FIRST, False, False,
+)
+
+_POLICY_TABLE: "dict[str, CategoryPolicy]" = dict(CATEGORY_POLICY)
+_POLICY_TABLE.setdefault("unknown", _UNKNOWN_POLICY)
+
+
 def _policy_for(category: str) -> CategoryPolicy:
-    if category == "unknown":
-        return CategoryPolicy(
-            CompositionBucket.UNKNOWN, SystemImpact.UNKNOWN,
-            ConfidenceLevel.LOW, DeletionRecommendation.REVIEW_FIRST, False, False,
-        )
-    return CATEGORY_POLICY.get(
-        category,
-        CategoryPolicy(
-            CompositionBucket.UNKNOWN, SystemImpact.UNKNOWN,
-            ConfidenceLevel.LOW, DeletionRecommendation.REVIEW_FIRST, False, False,
-        ),
-    )
+    """Policy for a category; unknown/unmapped categories share one instance.
+
+    ``CategoryPolicy`` is frozen, so mapping every unlisted category to the
+    same shared instance preserves value semantics (I10 item authority reads
+    fields only) while removing a fresh dataclass construction from the
+    50k-file scan path allocation peak.
+    """
+    return _POLICY_TABLE.get(category, _UNKNOWN_POLICY)
 
 
 def bucket_for_category(category: str, path: str = "") -> CompositionBucket:
@@ -356,7 +361,14 @@ def classify_scan(
 
     # ``browser`` paths under an explicit disposable marker directory
     # (e.g. ``Chrome\Cache``) are DISPOSABLE positive evidence, not an app tree.
-    bucket = bucket_for_category(kb_result.category, path)
+    # Refinement of ``bucket_for_category`` is inlined here to avoid a second
+    # ``_policy_for`` + path re-split on the per-file scan hot path; the public
+    # ``bucket_for_category`` is unchanged and stays the single mapping truth.
+    bucket = policy.bucket
+    if kb_result.category == "browser" and path:
+        parts = components(path)
+        if parts and any(part in _DISPOSABLE_MARKERS for part in parts):
+            bucket = CompositionBucket.DISPOSABLE
     if (
         bucket is CompositionBucket.DISPOSABLE
         and policy.bucket is not CompositionBucket.DISPOSABLE

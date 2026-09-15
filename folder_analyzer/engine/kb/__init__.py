@@ -88,6 +88,18 @@ def classify(path: str, *, _key: Optional[str] = None) -> KBResult:
     return KBResult(path=key, category="unknown", confidence_hint="low")
 
 
+_MISS = object()
+
+# Bounded per-folder filename verdict cache (Phase 8 fast path). Tiers 2/3/4
+# verdicts depend only on the folder parts plus the file name, so within one
+# ``ScanFolderContext`` repeated names can reuse the resolved tier-2/3/4
+# KBResult instead of re-running the marker/extension tables per file. Capped
+# so huge single folders never grow an unbounded dict; the registry fallback
+# (tier 5) is deliberately NOT cached (it re-tests the file path each call,
+# keeping its per-file semantics exact).
+_NAME_CACHE_CAP = 256
+
+
 class ScanFolderContext:
     """Per-folder pre-resolved dispatch state for the scan hot path.
 
@@ -102,10 +114,10 @@ class ScanFolderContext:
     """
 
     __slots__ = ("folder_key", "folder_parts", "t0_tree", "t0_exact", "t1", "t5",
-                 "t2_scan", "t4_scan")
+                 "t2_scan", "t4_scan", "name_cache")
 
     def __init__(self, folder_key, folder_parts, t0_tree, t0_exact, t1, t5,
-                 t2_scan=False, t4_scan=False) -> None:
+                 t2_scan=False, t4_scan=False, name_cache=None) -> None:
         self.folder_key = folder_key
         self.folder_parts = folder_parts
         self.t0_tree = t0_tree
@@ -114,6 +126,7 @@ class ScanFolderContext:
         self.t5 = t5
         self.t2_scan = t2_scan
         self.t4_scan = t4_scan
+        self.name_cache = name_cache
 
 
 def prepare_scan_folder(folder_path: str) -> ScanFolderContext:
@@ -143,6 +156,7 @@ def prepare_scan_folder(folder_path: str) -> ScanFolderContext:
         t5=modules["registry"].classify(key, _key=key),
         t2_scan=not modules["categories"].has_folder_marker(parts),
         t4_scan=not modules["apps"].has_folder_marker(parts),
+        name_cache={},
     )
 
 
@@ -173,12 +187,27 @@ def classify_scan_path(
         return KBResult(path=file_key, category=r.category, tier=1,
                         confidence_hint=r.confidence_hint, detail=r.detail)
     name = file_name.lower()
+    cache = ctx.name_cache
+    if cache is not None:
+        hit = cache.get(name, _MISS)
+        if hit is not _MISS:
+            if hit is None:
+                if ctx.t5 is not None:
+                    result = modules["registry"].classify(file_key, _key=file_key)
+                    if result is not None:
+                        return result
+                return KBResult(path=file_key, category="unknown",
+                                confidence_hint="low")
+            return KBResult(path=file_key, category=hit.category, tier=hit.tier,
+                            confidence_hint=hit.confidence_hint, level=hit.level,
+                            detail=hit.detail)
     if ctx.t2_scan:
         result = modules["categories"].classify_scan_name(file_key, name)
     else:
         result = modules["categories"].classify(
             file_key, _key=file_key, _parts=ctx.folder_parts + (name,))
     if result is not None:
+        _remember(ctx, name, result)
         return result
     if ctx.t4_scan:
         result = modules["apps"].classify_scan_name(file_key, name)
@@ -186,12 +215,25 @@ def classify_scan_path(
         result = modules["apps"].classify(
             file_key, _key=file_key, _parts=ctx.folder_parts + (name,))
     if result is not None:
+        _remember(ctx, name, result)
         return result
     if ctx.t5 is not None:
         result = modules["registry"].classify(file_key, _key=file_key)
         if result is not None:
             return result
+    _remember(ctx, name, None)
     return KBResult(path=file_key, category="unknown", confidence_hint="low")
+
+
+def _remember(ctx: ScanFolderContext, name: str, result) -> None:
+    """Store a tier-2/3/4 filename verdict in the bounded per-folder cache.
+
+    None means "both component tiers missed" so a repeated name skips straight
+    to the tier-5 fallback / unknown exactly as the missed path would.
+    """
+    cache = ctx.name_cache
+    if cache is not None and len(cache) < _NAME_CACHE_CAP:
+        cache[name] = result
 
 
 def classify_content(path: str, level: int = 2) -> KBResult:
