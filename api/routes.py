@@ -6,7 +6,7 @@ import string
 from fastapi import APIRouter, HTTPException, Request
 from send2trash import send2trash
 
-from folder_analyzer.scanner import Scanner, sort_folders_by_size
+from folder_analyzer.scanner import ScanCancellation, Scanner, sort_folders_by_size
 from folder_analyzer.safety import (
     get_risk_level,
     get_risk_hex,
@@ -143,7 +143,9 @@ def scan_folder(req: ScanRequest, request: Request, lang: str = "en"):
         raise HTTPException(status_code=400, detail=f"Path does not exist: {path}")
 
     scanner = Scanner(max_workers=16)
-    root = scanner.scan(path)
+    cancellation = ScanCancellation()
+    request.app.state.last_scan_cancellation = cancellation
+    root = scanner.scan(path, cancellation=cancellation)
     scan_result = scanner.scan_result()
     request.app.state.last_scan_root = root
     request.app.state.last_scan_result = scan_result
@@ -169,6 +171,21 @@ def scan_folder(req: ScanRequest, request: Request, lang: str = "en"):
         stats=stats,
         top_folders=top_folders,
     )
+
+
+@router.post("/api/scan/cancel")
+def cancel_scan(request: Request):
+    """Request cancellation of an in-flight scan.
+
+    The scanner checks the shared token at folder granularity (and at least
+    once every 4096 files inside a folder), so the running request returns a
+    partial ScanResult with ``cancelled`` set rather than being hard-killed.
+    """
+    token = getattr(request.app.state, "last_scan_cancellation", None)
+    if token is None:
+        raise HTTPException(status_code=400, detail="No scan in progress to cancel.")
+    token.cancel()
+    return {"cancelled": True}
 
 
 @router.get("/api/folders")

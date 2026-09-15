@@ -49,6 +49,33 @@ from .engine.retention import (
 ProgressCallback = Callable[[int, int], None]
 
 
+class ScanCancellation:
+    """Core-side cancellation token for ``Scanner.scan`` (Phase 8).
+
+    Thread-safe. ``cancel()`` may be called from any thread while a scan runs;
+    the scanner checks ``is_cancelled`` at folder granularity (and at least
+    once every ``_CANCEL_CHECK_EVERY`` files inside a folder) and stops as soon
+    as the check fires, returning the partial tree. A cancelled scan result is
+    explicit: ``scan_result().cancelled`` is True and represents only the
+    folders already completed at cancel time.
+    """
+
+    __slots__ = ("_event",)
+
+    def __init__(self) -> None:
+        self._event = threading.Event()
+
+    def cancel(self) -> None:
+        self._event.set()
+
+    @property
+    def is_cancelled(self) -> bool:
+        return self._event.is_set()
+
+
+_CANCEL_CHECK_EVERY = 4096
+
+
 @dataclass
 class FolderInfo:
     path: str
@@ -154,17 +181,22 @@ class Scanner:
         self._on_progress: Optional[ProgressCallback] = None
         self._scan_tree: Optional[FolderInfo] = None
         self._tallies: Dict[str, _FolderTally] = {}
+        self._cancellation: Optional[ScanCancellation] = None
+        self._cancelled = False
 
     def scan(
         self,
         root_path: str,
         on_progress: Optional[ProgressCallback] = None,
+        cancellation: Optional[ScanCancellation] = None,
     ) -> FolderInfo:
         self._scanned_folders = 0
         self._scanned_files = 0
         self._inaccessible = 0
         self._on_progress = on_progress
         self._tallies = {}
+        self._cancellation = cancellation
+        self._cancelled = False
 
         root_path = os.path.normpath(root_path)
         root_info = FolderInfo(
@@ -177,6 +209,8 @@ class Scanner:
         return root_info
 
     def _scan_folder(self, info: FolderInfo, path: str, use_threads: bool = True):
+        if self._is_cancelled():
+            return
         try:
             entries = list(os.scandir(path))
         except (PermissionError, OSError) as e:
@@ -191,7 +225,11 @@ class Scanner:
         assessments: "Dict[str, ScanAssessment]" = {}
         tally = _FolderTally()
         ctx = prepare_scan_folder(path)
+        inspected = 0
         for entry in entries:
+            if inspected % _CANCEL_CHECK_EVERY == 0 and self._is_cancelled():
+                return
+            inspected += 1
             try:
                 if entry.is_file(follow_symlinks=False):
                     try:
@@ -282,6 +320,16 @@ class Scanner:
     def _report_progress(self):
         if self._on_progress:
             self._on_progress(self._scanned_folders, self._scanned_files)
+
+    def _is_cancelled(self) -> bool:
+        if self._cancellation is not None and self._cancellation.is_cancelled:
+            self._cancelled = True
+            return True
+        return False
+
+    @property
+    def cancelled(self) -> bool:
+        return self._cancelled
 
     @property
     def scanned_folders(self) -> int:
@@ -431,6 +479,7 @@ class Scanner:
             inaccessible_count=self._inaccessible,
             folder_errors=tuple(errors),
             per_folder=per_folder,
+            cancelled=self._cancelled,
         )
 
 

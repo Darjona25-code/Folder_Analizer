@@ -270,3 +270,4 @@ class ScanResult:
     inaccessible_count: int = 0
     folder_errors: Tuple[str, ...] = ()
     per_folder: Dict[str, FolderAggregation] = field(default_factory=dict)
+    cancelled: bool = False
