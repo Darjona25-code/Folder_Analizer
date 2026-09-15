@@ -51,3 +51,21 @@ def scan_sandbox(classification_neutral_env):
     finally:
         shutil.rmtree(root, ignore_errors=True)
         reset_session_caches()
+
+
+@pytest.fixture
+def mixed_sandbox(scan_sandbox):
+    """Scan root with a SAFE disposable folder under a REVIEW_FIRST parent.
+
+    Mirrors I10: ``Data/cache`` is individually actionable while its bulk
+    parent ``Data`` (which holds user text) is not.
+    """
+    data = os.path.join(scan_sandbox, "Data")
+    cache = os.path.join(data, "cache")
+    os.makedirs(cache)
+    with open(os.path.join(data, "notes.txt"), "w", encoding="utf-8") as fh:
+        fh.write("hello")
+    for name in ("a.tmp", "b.tmp"):
+        with open(os.path.join(cache, name), "w", encoding="utf-8") as fh:
+            fh.write("tmp")
+    return scan_sandbox, data, cache

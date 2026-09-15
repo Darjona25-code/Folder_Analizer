@@ -10,6 +10,8 @@ from __future__ import annotations
 import os
 from typing import Callable, Dict, List, Optional
 
+from send2trash import send2trash
+
 from folder_analyzer.engine.enums import DeletionRecommendation
 from folder_analyzer.engine.explain import resolve_reason
 from folder_analyzer.i18n import I18n
@@ -127,7 +129,6 @@ class DesktopController:
             revalidate,
             validate_delete_target,
         )
-        from send2trash import send2trash
 
         results: List[dict] = []
         for path in paths:
