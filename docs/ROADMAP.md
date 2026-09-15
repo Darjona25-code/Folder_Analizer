@@ -1,6 +1,6 @@
 # Folder Analyzer — Master Roadmap v3.0
 
-Status: **APPROVED — Phases 1–6 complete. Phase 6 (Exports v2) verification closed: recursive-composition fix landed (composition = full recursive aggregation), reason localization + `scan_result()`-fold guardrail covered (suite 334 passed / 2 skipped). Pending formal acceptance before Phase 7 (Web UI + i18n migration).**
+Status: **APPROVED — Phases 1–7 complete. Phase 7 (Web UI + single-source i18n migration) delivered and submitted for acceptance: single-source `locales/{en,es}.json` (ui + reasons namespaces) consumed by CLI/API/exports/Web UI, schema-v2 API surfaces, I10 folder/file gating, zero re-classification (suite 354 passed / 2 skipped, benchmark scan-side unchanged). Pending formal acceptance before Phase 8 (Performance & Scale).**
 Version of this document: Phase 1 baseline commit.
 
 This is the implementation contract for the project. It is the single, internally
@@ -560,10 +560,10 @@ Fixed process (re-affirmed):
     `docs/ARCHITECTURE.md` §6a). Suite 313 passed / 2 skipped.
 
 ### Phase 6 — Exports v2
-- **Status:** COMPLETE — verification point 1 (composition field semantics) fixed;
-  points 2+3 confirmed and covered. Commits `4b4b7a9` / `85f8fa8` / `63f8cd7`
-  + composition fix commit. Submitted for formal acceptance, which authorizes
-  Phase 7.
+- **Status: COMPLETE — FORMALLY APPROVED (2026-09-14).** Verification point 1
+  (composition field semantics) fixed; points 2+3 confirmed and covered.
+  Commits `4b4b7a9` / `85f8fa8` / `63f8cd7` + `445738a` (fix/verify). Approval
+  authorized Phase 7.
 - **Objective:** export schema v2 (assessment fields + `analysis_state` markers); CSV/HTML/JSON deterministic.
 - **Why:** offline consumption; stable documented schema.
 - **Dependencies:** Phase 5.
@@ -600,6 +600,18 @@ Fixed process (re-affirmed):
 - **Estimated effort:** 4–7 h. **Uncertainty:** Low.
 
 ### Phase 7 — Web UI Adaptation + i18n
+- **Status: COMPLETE (2026-09-14, submitted for acceptance).** Single-source i18n
+  landed (`folder_analyzer/locales/{en,es}.json`, `ui` + `reasons` namespaces;
+  `i18n.py` + `explain.py` read the same files; `/api/i18n` serves them to the
+  browser — `fb7259a`). API v2 surfaces (`/api/scan?lang=` per-folder
+  `AssessmentView` + recursive composition, `/api/folder/files` retained-record
+  rows with `evicted` flag, zero re-classification via read-only
+  `Scanner.retained_records_for` — `d7988d6`). Schema-v2 Web UI with locale
+  lookups and I10 gating (`isActionEnabled`: REVIEW_FIRST folder bulk-delete
+  disabled; individually SAFE file actionable inside it) — `8e52976`. Suite
+  **354 passed, 2 skipped**; benchmark confirms **no scan-side impact**
+  (`t_fold` 0.492 ms, alloc 0.26 MiB, retained 7,400 @ +0%, byte-identical
+  export output).
 - **Objective:** web assessment columns + explanations; delete gating matrix; single-source i18n migration.
 - **Why:** web must represent the safety model truthfully.
 - **Dependencies:** Phases 5, 6; decisions D2 (i18n) and D3 (API/Web optional) approved.
@@ -716,6 +728,11 @@ Fixed process (re-affirmed):
    and the primary optimization window
    (folder-prefix classification caching, filename-only Tier-3 decisions) is a Phase 8
    activity. Re-evaluate at every phase close; do not let this regress further.
+   **Outcome (Phase 7 close):** honored — Phase 7 touched no scan hot path; the
+   UI reads retained records only (`Scanner.retained_records_for`, no
+   re-classification) and `/api/i18n`/`/api/scan`/`/api/folder/files` consume the
+   already-collected `ScanResult`; benchmark confirms `t_fold` 0.492 ms (+0.12%)
+   and output byte-identical.
 8. **Example 6 confidence value — REVERTED to the approved source's MEDIUM
    (2026-09-13).** The approved source specifies `Ex6 = NONE/REVIEW_FIRST/MEDIUM`
    (aggregation: `safe_pct = 0.20`, `protected_pct = 0`, `unknown_pct = 0`,

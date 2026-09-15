@@ -222,7 +222,14 @@ folder-analyzer --path C:\
 - **Next:** Phase 6 — Exports v2 (export schema v2 with assessment fields +
   `analysis_state` markers; deterministic CSV/HTML/JSON).
 
-## Phase 6 — Exports v2 (COMPLETED — submitted, pending formal acceptance)
+## Phase 6 — Exports v2 (COMPLETED — formally APPROVED 2026-09-14)
+
+- **Status:** reviewer formally approved on 2026-09-14; Phase 7 authorized with
+  the final report at commit `445738a` (pushed). Verification points 1–3 all
+  confirmed with evidence (recursive composition fix verified multi-level;
+  `scan_result()` fold executed under the 8 patchers with 0 classifier/KB
+  calls; `uncertain` + every producible key localized through actual CSV/HTML
+  rows, EN+ES).
 
 - **Delivered** (approved scope, commits `4b4b7a9` feat / `85f8fa8` test /
   `63f8cd7` bench):
@@ -291,3 +298,56 @@ folder-analyzer --path C:\
 - **Next:** awaits formal Phase 6 acceptance (`"Phase 6 approved, proceed to
   Phase 7"`). Phase 7 — Web UI + single-source i18n migration (`locales/*.json`),
   no further classification/composition changes (per approved scope).
+
+## Phase 7 — Web UI + Single-Source i18n Migration (COMPLETED — submitted for acceptance)
+
+- **Delivered** (approved scope — pushed; await `"Phase 7 approved, proceed to
+  Phase 8"` before any Phase 8 work):
+  1. **Single-source i18n** (`folder_analyzer/locales/en.json` + `es.json`):
+     two namespaces per language — `ui` (ex-`i18n.STRINGS`) and `reasons`
+     (ex-`explain.REASONS` → re-exported from `folder_analyzer/i18n`).
+     CLI, exporters, API, and Web UI all read the same two files; no Python
+     dict duplicates strings. `tests/test_locales.py`: EN/ES key parity per
+     namespace, file shape/all-str, Python modules reading exactly the
+     migrated files, Phase-6 reason-key registry (22 keys incl. `uncertain`)
+     resolving non-raw in both locales.
+  2. **API v2 surfaces** (`api/models.py`, `api/routes.py`): `/api/scan?lang=`
+     now returns per-folder `AssessmentView` (localized `reason` via
+     `explain.resolve_reason` from the single source) + recursive
+     `composition`/`recursive_total` (mirrors the v2 JSON export shape);
+     `GET /api/i18n?lang=` serves `{ui, reasons}` straight from the locale
+     files; `GET /api/folder/files?path=&lang=` serves retained per-file
+     `FileDict` rows with `evicted` flag.
+  3. **Zero re-classification:** new read-only `Scanner.retained_records_for`
+     (never re-analyzes; evicted folders → empty + `evicted: true`). The UI
+     never calls `records_for` / re-scans.
+  4. **Schema-v2 Web UI** (`web/`): recommendation / confidence / impact /
+     localized reason per folder AND per retained file (drill-down panel);
+     per-folder recursive total; all strings via `t()` / `data-i18n` from the
+     locale files; language switch persisted in `localStorage`.
+  5. **I10 in the UI:** `isActionEnabled(deletable, recommendation)` gates the
+     FOLDER bulk action (REVIEW_FIRST ⇒ disabled) while an individually
+     SAFE_TO_DELETE/HIGH file stays actionable inside a REVIEW_FIRST folder;
+     server-localized `reason` is the only text rendered (no raw reason_key).
+- **Suite:** 334 → **354 passed, 2 skipped** (+20: `tests/test_locales.py` +4,
+  `tests/test_api.py` Phase-7 contract block +8, `tests/test_web_assets.py`
+  +8). The Phase 6 CSV/HTML reason-coverage audit discipline was extended to
+  the API rows (reason non-raw, `reason_key ∈ reasons`, no `{placeholders}`)
+  and to executable JS (comment-stripped `reason_key`-absence + pinned-English
+  literal absence + every `t()`/`data-i18n` key exists in both en/es files).
+- **Benchmark (pinned P-cores [0,1], raw uninstrumented, 50k fixture):
+  scan-side UNCHANGED** — `t_scan` 0.414 s (Phase 6: 0.470 s; faster,
+  no regression), `t_fold(scan_result)` **0.492 ms = +0.12%** (Phase 6:
+  0.494 ms), export generation JSON 2.4 / CSV 1.1 / HTML 1.2 ms (total
+  4.7 ms), gate alloc-peak **0.26 MiB**, retained **7,400 @ +0%**, output
+  bytes byte-identical at 59,862 / 7,509 / 30,081. No engine/classifier/KB/
+  recommender changes (Phase 5 remains closed).
+- **Docs:** `docs/ARCHITECTURE.md` (UI + API module map, Phase-7 benchmark
+  row), `docs/ROADMAP.md` (Phase 7 → COMPLETE), `CHANGELOG.md` [Unreleased].
+- **Commits:** `fb7259a` feat(i18n) single-source locales → `d7988d6` feat(api)
+  v2 views + i18n + folder-files → `8e52976` feat(web) v2 UI + I10 gating →
+  `docs` (this commit). Pushed to `origin/master`.
+- **Next:** awaits formal Phase 7 acceptance. Phase 8 — Performance & Scale
+  (full perf suite re-confirmed as a smoke benchmark here; the +445% Phase-5
+  classification cost and unimplemented perf items stay Phase 8 scope). Do NOT
+  begin Phase 8 without explicit approval.

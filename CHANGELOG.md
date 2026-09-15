@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Phase 7 — Web UI + Single-Source i18n Migration)
+
+- **Single-source i18n** (`folder_analyzer/locales/en.json` + `es.json`):
+  every translation string now lives in one place per language, in two
+  namespaces — `ui` (ex-`i18n.STRINGS`, CLI/export/API/web) and `reasons` (ex
+  `explain.REASONS`, the Phase 2/5/6 reason-key registry). `i18n.py` loads
+  files at import and re-exports both; `explain.resolve_reason` reads the same
+  source. No Python dict duplicates translation strings. CLI, exporters, API,
+  and the Web UI (via `GET /api/i18n`) all consume the same two files.
+- **Locale guarantees** (`tests/test_locales.py`): EN/ES key parity per
+  namespace, file shape + all-`str` values, the Python modules reading exactly
+  the migrated files, and every Phase 6 registered reason_key (22, incl.
+  `uncertain`) resolving to non-raw text in both languages.
+- **API v2 surfaces** (`api/`): `/api/scan?lang=` folder dicts now carry a
+  localized `AssessmentView` (recommendation/confidence/impact/reason +
+  `reason_key` for audit) and the recursive `composition`
+  (`recursive_total`), mirroring the v2 JSON export shape; `GET /api/i18n?lang=`
+  serves the single-source ui/reasons payload to the browser; `GET
+  /api/folder/files?path=&lang=` streams the already-retained per-file records
+  as localized `FileDict` rows with an `evicted` flag.
+- **Zero re-classification (UI):** new read-only `Scanner.retained_records_for`
+  serves only what the retention store already holds from the scan; evicted
+  folders return an empty list + `evicted: true`. The UI never calls
+  `records_for`/re-scans (Phase 6 principle).
+- **Schema-v2 Web UI** (`web/`): table shows recommendation / confidence /
+  impact / localized reason per folder AND per retained file (drill-down
+  panel); per-folder recursive total; all strings from the locale files
+  (`data-i18n` + `t()` lookups, language switch, `lang` persisted).
+- **I10 item-vs-folder authority in the UI:** the FOLDER bulk-delete is gated
+  by the folder's own assessment (`isActionEnabled(deletable, recommendation)`
+  — REVIEW_FIRST ⇒ disabled); an individually SAFE_TO_DELETE/HIGH file inside
+  a REVIEW_FIRST folder stays actionable. The API serves independent
+  per-folder and per-file recommendations so the frontend implements I10
+  without any folder-level assumption.
+- **No raw reason_key in the rendered UI:** the API interpolates locale
+  `reason` text server-side; `app.js` renders `reason` only (audit-test strips
+  comments and asserts `reason_key` never appears in executable JS), with no
+  hardcoded English literals remaining.
+- **Tests** (`tests/test_locales.py`, `test_api.py` Phase-7 block,
+  `test_web_assets.py`): locale parity/presence, localized-scan and
+  folder-files contract surfaces, served `reason` non-raw (`!= reason_key`,
+  no unsubstituted `{placeholders}`, key ∈ reasons), I10 gating-data rule
+  mirrored from the UI predicate, frontend never-renders-reason_key + no
+  English literals + every `t()`/`data-i18n` key present in both locale files.
+  Suite grew **334 → 354 passed, 2 skipped** (+20).
+- **Benchmark (Phase 7 smoke confirmation, pinned P-cores [0,1], raw
+  uninstrumented, 50k fixture):** scan-side unchanged — `t_scan` 0.414–0.416 s,
+  `t_fold(scan_result)` **0.492 ms = +0.12%** (Phase 6: 0.494 ms), export
+  generation JSON 2.4 / CSV 1.1 / HTML 1.2 ms (total 4.7 ms), gate alloc-peak
+  **0.26 MiB**, retained **7,400 @ +0%**, output bytes byte-identical at
+  **59,862 / 7,509 / 30,081**. No engine/classifier/KB/recommender changes
+  (Phase 5 remains closed).
+- **Docs:** `docs/ARCHITECTURE.md` (UI + API module map, Phase-7 benchmark
+  row), `docs/ROADMAP.md` (Phase 7 → COMPLETE), `SESSION.md`.
+
 ### Added (Phase 6 — Exports v2)
 
 - **v2 exporters** (`folder_analyzer/exporter.py`, `export_json_v2` /

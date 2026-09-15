@@ -1,11 +1,12 @@
 # Folder Analyzer — Architecture
 
-Status: **Phase 5 — Recommendation Engine + Folder Composition wired into the scan.**
+Status: **Phase 7 — Web UI + Single-Source i18n Migration.** Phase 5 (recommendation
+engine + folder composition) and Phase 6 (Exports v2) are closed/approved.
 This document
 intentionally contains only the core/interface boundary, the current module map, the
-CLI/Web/Desktop relationship, and the benchmark table. Performance (§ Phase 8), desktop
-(§ Phase 9/10), packaging (§ Phase 11), and localization (§ Phase 7) sections will be
-expanded in their respective phases.
+CLI/Web/Desktop relationship, and the benchmark table. Performance (§ Phase 8) and
+desktop (§ Phase 9/10) sections will be expanded in their respective phases; the
+locales/UI map is current as of Phase 7.
 
 ---
 
@@ -33,11 +34,11 @@ Interfaces:
 - **Desktop** (PySide6, Phase 9+) consumes the core **directly in-process**. There is
   **no** `Desktop → localhost FastAPI → Core` path.
 
-## 2. Current module map (Phase 5)
+## 2. Current module map (Phase 7)
 
 | Module | Responsibility | Boundary |
 |---|---|---|
-| `folder_analyzer/scanner.py` | Multi-threaded disk scan → `FolderInfo` tree + `ScanResult`; per-file Level-1 metadata (zero extra syscalls); per-folder `FolderAggregation`; on-demand single-folder re-scan (`records_for`) | Core |
+| `folder_analyzer/scanner.py` | Multi-threaded disk scan → `FolderInfo` tree + `ScanResult`; per-file Level-1 metadata (zero extra syscalls); per-folder `FolderAggregation`; on-demand single-folder re-scan (`records_for`, drill-down only) + read-only `retained_records_for` (Phase 7, UI path — never re-analyzes) | Core |
 | `folder_analyzer/deleter.py` | User-facing safe deletion flow (CLI-level) | Core (UI-agnostic; uses Rich only for CLI presentation) |
 | `folder_analyzer/security_guard.py` | Six-condition canonical deletion guard | Core — security boundary |
 | `folder_analyzer/audit.py` | Append-only JSON Lines deletion audit log | Core |
@@ -45,17 +46,18 @@ Interfaces:
 | `folder_analyzer/engine/enums.py` | Three-axis value spaces: `SystemImpact` / `DeletionRecommendation` / `ConfidenceLevel` | Core — safety model |
 | `folder_analyzer/engine/models.py` | Immutable `Assessment` (phase 2, confidence gate I9/I3/I7) + `FileEntry` / `FolderAggregation` / `ScanResult` (phase 3, metadata-only) | Core — safety model + data-model boundary |
 | `folder_analyzer/engine/retention.py` | `RetentionConfig` + `RetainedFileStore`: bounded prioritized FileRecord retention (non-safe → representative → largest), lazy `FileEntry` materialization from raw `(DirEntry, stat)` pairs | Core — retention boundary |
-| `folder_analyzer/engine/explain.py` | `reason_key` → localized EN/ES text (Phase 2 keys + Phase 5 item/folder reason keys; full i18n migration is Phase 7) | Core |
+| `folder_analyzer/engine/explain.py` | `reason_key` → localized EN/ES text (Phase 2 keys + Phase 5 item/folder reason keys); single-source since Phase 7 (reads the `reasons` namespace of `locales/*.json` via `folder_analyzer/i18n`) | Core |
 | `folder_analyzer/engine/kb/` | Tiered knowledge base (roadmap §10): T0 critical/system paths, T1 env + Known Folders, T2 component patterns, T3 extension table, T4 app rules, T5 optional registry; `classify`/`classify_content` → `KBResult`; bounded L2/L3 content reads; per-session batch caching. Wired into the scan path since Phase 5 (single-normalize tier dispatch, cached tier modules) | Core — KB boundary |
+| `folder_analyzer/i18n.py` | Single-source loader (Phase 7): loads `locales/{lang}.json` once at import and exposes `STRINGS[lang]` = `file["ui"]` and `REASONS[lang]` = `file["reasons"]`; `I18n.t()/set_lang` unchanged. No translation string lives in Python. | Core |
+| `folder_analyzer/locales/` | `en.json` + `es.json` — the single source of truth for BOTH namespaces: `ui` (app/CLI/export/API/web strings) and `reasons` (the reason_key registry). EN/ES key parity enforced by `tests/test_locales.py`. | Core — data |
 | `folder_analyzer/engine/classifier.py` | `classify_path`/`classify_scan`: KB result | policy | `Assessment` / lean `ScanAssessment` (bucket precomputed); successful pipeline only — `NOT_RESOLVABLE` returns `None` and aggregator normalizes to `UNKNOWN/a`; `fuse_folders_and_files`-style summary is compositional (see `recommender`) | Core — assessment boundary |
 | `folder_analyzer/engine/recommender.py` | `derive_folder_recommendation`: roadmap §11 short-circuit R1–R5 with named `CompositionConfig` (0.85/0.10/0.15), R3 demotion (unknown ≥ 0.25), Downloads floor `REVIEW_FIRST`, 8 canonical examples, 100 GB case | Core — composition boundary |
 | `folder_analyzer/utils.py` | Size formatting, drive default | Core |
 | `folder_analyzer/treemap.py` | Treemap layout (presentation helper) | Core |
 | `folder_analyzer/reporter.py` | Rich reporting helpers | Core |
 | `folder_analyzer/exporter.py` | JSON/CSV/HTML export: v1 schema (backward compat) + **v2 (Phase 6, ScanResult-backed, deterministic, zero-reclassification; composition = full recursive aggregation)** | Core |
-| `folder_analyzer/i18n.py` | EN/ES string dict (Phase 7 → locales JSON) | Core |
-| `api/` | FastAPI app + Pydantic models — web adapter | Interface |
-| `web/` | Static front-end (index.html, js, css) | Interface |
+| `api/` | FastAPI app (`main.py`) + routes (`routes.py`) + Pydantic models (`models.py`) — web adapter. Phase 7 surfaces: `/api/scan?lang=` (per-folder localized `AssessmentView` + recursive `composition`/`recursive_total`), `/api/i18n?lang=` (single-source `{ui, reasons}`), `/api/folder/files?path=&lang=` (retained records, `evicted` flag, zero re-classification) | Interface |
+| `web/` | Static front-end (`index.html`, `js/app.js`, `css/style.css`): schema-v2 consumption (folder + per-file recommendation/confidence/impact/localized reason; drill-down panel; recursive total), locale-file lookups, I10 item-vs-folder gating (`isActionEnabled`), no raw `reason_key` rendered | Interface |
 | `benchmarks/` | Fixture generator + smoke benchmark (fixed baseline) | Tooling |
 | `tests/` | pytest suites | Tooling |
 
@@ -78,6 +80,16 @@ carries its `ScanAssessment`/bucket; per-folder aggregation buckets bytes into
 recommendations (I10: item-level `SAFE_TO_DELETE`+`HIGH` authority is preserved
 beneath a folder's derived `REVIEW_FIRST`; the folder recommendation gates only the
 folder-as-a-whole action).
+
+Phase 7 (interface layer only — **no engine/classifier/KB change**): the Web UI
+consumes the scan-time `ScanResult` through the API. Every per-folder `AssessmentView`
+and per-file `FileDict` row is serialized with a **localized** `reason` interpolated
+from the single-source locale files (`/api/i18n` is the same source the CLI and
+exporters read). The UI never re-classifies: `/api/folder/files` reads only the
+retention store via `Scanner.retained_records_for` (evicted folders report
+`evicted: true` with empty rows), and I10 is implemented as an enable rule
+(`deletable && recommendation == "safe_to_delete"`) applied independently to folder
+bulk actions and to each file row.
 
 ## 3. CLI / Web / Desktop relationship
 
@@ -251,6 +263,7 @@ LP-E ~2.7 s for the 50k scan), and RSS-delta is a working-set sampling artifact 
 | **4′** | **0.985–1.006** (5 runs; ±2.1%) | ~49,700 | **11.64–12.60** | **7,400** | 31.96–34.21 | **CORRECTED Phase-4 baseline (Phase 5 harness): pinned to P-cores [`0,1`/`10,11`], gate = alloc-peak + retained.** Supersedes the noisy RSS-based rows above as the reference for all future phases. Runs: `benchmarks/results/baseline-phase5-pinned-r1..r5.json` |
 | **5** | 4.204–4.310 (4-run) | ~11,600–11,900 | **13.13–14.37** (4 runs) | **7,400** | 36.43–38.88 | **Phase 5: recommendation engine (Assessment) + folder composition wired into the scan path**, plus classifier + KB module caching and path-normalize hoisting (all instrumented). Representative gate deltas vs 4′ (mean 12.01): **+13.9% (mean-to-mean) / +15.9% (median)**; best-to-best +12.8%, worst-to-worst +14.0% — within the 20% gate. (A coincidental max-vs-min pairing reached +20.6%; repeated clean runs show it is the noise band, not a stable condition — see §6a.) **Uninstrumented (direct wall-clock): Phase 4 0.137–0.151 s → Phase 5 0.778–0.787 s = +445% (5.5×) REAL cost.** tracemalloc inflates *both* phases ~6–7× (metadata scan 0.985–1.006 s instrumented vs 0.14 s plain), so instrumented wall is not interpreted as real cost. The +445% is genuine new classification/composition work **flagged as a Phase 8 (Performance & Scale) priority** — see §6a. Runs (locally, `benchmarks/results/` gitignored): `benchmarks/results/phase5-pinned-r{1..3}.json`, `phase5-pinned.json`, plus 4 clean remeasures. |
 | **6** | 0.470 (uninstrumented; 0.494 ms `scan_result` fold added) | ~119,000 | fold+export **0.26** | **7,400** | n/a | **Phase 6: Exports v2 — no scanner hot-path change.** v2 exporters consume the collected ScanResult only; scan-side delta = `Scanner.scan_result()` fold **0.494 ms = +0.11%** (uninstrumented, pinned P-cores [`0,1`], 50k fixture). **Export generation (own honest number, after the recursive-composition fold): JSON 2.6 ms / CSV 0.9 ms / HTML 0.8 ms (total 4.3 ms)**; output 59,862 / 7,509 / 30,081 B, byte-identical across runs. **Composition fields are the full recursive aggregation** (`root_composition.total_bytes == total_size`), folded from scan-time `FolderComposition` values — no engine access. Runs: `benchmarks/results/phase6-export-r{1..3}.json` (`benchmarks/run_export.py`). |
+| **7** | 0.414 (uninstrumented) | ~120,655 | fold+export **0.26** | **7,400** | 16.32 | **Phase 7: Web UI + single-source i18n — NO scan hot-path change (engine/classifier/KB untouched).** Locale files load once at import. `t_scan` 0.414–0.416 s, `t_fold(scan_result)` **0.492 ms = +0.12%** (Phase 6: 0.494 ms), export generation JSON 2.4 / CSV 1.1 / HTML 1.2 ms (total 4.7 ms), gate alloc-peak **0.26 MiB**, retained **7,400 @ +0%**, output bytes byte-identical at 59,862 / 7,509 / 30,081. UI/per-file reads go through read-only `Scanner.retained_records_for` (zero re-classification) and `/api/i18n` serves the same locale files the CLI/exports use. |
 
 ### 6a. Performance evidence for the Phase 5 close (reviewer-required remeasure)
 
