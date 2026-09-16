@@ -1,8 +1,9 @@
-"""Offscreen Qt smoke tests for the desktop UI (Phase 9).
+"""Offscreen Qt smoke tests for the desktop UI (Phase 9; Phase 10 surfaces).
 
 Run headless via ``QT_QPA_PLATFORM=offscreen`` (set before any Qt import).
 Real classification assertions use the mandatory fixtures per the project
-test conventions.
+test conventions. Every window is constructed with a temporary config path so
+the real user settings file is never read or written.
 """
 
 import os
@@ -35,8 +36,12 @@ def _wait_for_scan(window, app, timeout=120.0):
     app.processEvents()
 
 
-def test_window_builds_offscreen(qapp):
-    window = MainWindow()
+def _cfg(tmp_path) -> str:
+    return str(tmp_path / "cfg.json")
+
+
+def test_window_builds_offscreen(qapp, tmp_path):
+    window = MainWindow(config_path=_cfg(tmp_path))
     window.show()
     qapp.processEvents()
     try:
@@ -51,9 +56,9 @@ def test_window_builds_offscreen(qapp):
         window.deleteLater()
 
 
-def test_offscreen_scan_populates_table_and_gates_delete(qapp, mixed_sandbox):
+def test_offscreen_scan_populates_table_and_gates_delete(qapp, mixed_sandbox, tmp_path):
     root, data, cache = mixed_sandbox
-    window = MainWindow()
+    window = MainWindow(config_path=_cfg(tmp_path))
     window.show()
     qapp.processEvents()
     try:
@@ -86,9 +91,9 @@ def test_offscreen_scan_populates_table_and_gates_delete(qapp, mixed_sandbox):
         window.deleteLater()
 
 
-def test_offscreen_cancelled_scan_shows_partial_notice(qapp, mixed_sandbox):
+def test_offscreen_cancelled_scan_shows_partial_notice(qapp, mixed_sandbox, tmp_path):
     root, _, _ = mixed_sandbox
-    window = MainWindow()
+    window = MainWindow(config_path=_cfg(tmp_path))
     window.show()
     qapp.processEvents()
     try:
@@ -112,9 +117,9 @@ def test_offscreen_cancelled_scan_shows_partial_notice(qapp, mixed_sandbox):
         window.deleteLater()
 
 
-def test_drill_down_shows_retained_files_with_i10_gates(qapp, mixed_sandbox):
+def test_drill_down_shows_retained_files_with_i10_gates(qapp, mixed_sandbox, tmp_path):
     root, data, cache = mixed_sandbox
-    window = MainWindow()
+    window = MainWindow(config_path=_cfg(tmp_path))
     window.show()
     qapp.processEvents()
     try:
@@ -136,9 +141,7 @@ def test_drill_down_shows_retained_files_with_i10_gates(qapp, mixed_sandbox):
         window.show_drill_down(cache)
         qapp.processEvents()
         assert window._file_table.rowCount() == 2
-        names = [
-            window._file_table.item(i, 0).text() for i in range(2)
-        ]
+        names = [window._file_table.item(i, 0).text() for i in range(2)]
         assert set(names) == {"a.tmp", "b.tmp"}
 
         window._file_table.clearSelection()
@@ -168,7 +171,7 @@ def test_drill_down_shows_retained_files_with_i10_gates(qapp, mixed_sandbox):
         window.deleteLater()
 
 
-def test_drill_down_evicted_folder_shows_folder_level_notice(qapp, mixed_sandbox):
+def test_drill_down_evicted_folder_shows_folder_level_notice(qapp, mixed_sandbox, tmp_path):
     root, data, cache = mixed_sandbox
     bulk = os.path.join(root, "bulk")
     os.makedirs(bulk)
@@ -178,7 +181,7 @@ def test_drill_down_evicted_folder_shows_folder_level_notice(qapp, mixed_sandbox
 
     from folder_analyzer.engine.retention import RetentionConfig
 
-    window = MainWindow()
+    window = MainWindow(config_path=_cfg(tmp_path))
     window.show()
     qapp.processEvents()
     try:
@@ -198,9 +201,9 @@ def test_drill_down_evicted_folder_shows_folder_level_notice(qapp, mixed_sandbox
         window.deleteLater()
 
 
-def test_drill_down_relocalizes_on_language_switch(qapp, mixed_sandbox):
+def test_drill_down_relocalizes_on_language_switch(qapp, mixed_sandbox, tmp_path):
     root, data, cache = mixed_sandbox
-    window = MainWindow()
+    window = MainWindow(config_path=_cfg(tmp_path))
     window.show()
     qapp.processEvents()
     try:
@@ -233,9 +236,9 @@ def test_drill_down_relocalizes_on_language_switch(qapp, mixed_sandbox):
         window.deleteLater()
 
 
-def test_details_panel_matches_row_values(qapp, mixed_sandbox):
+def test_details_panel_matches_row_values(qapp, mixed_sandbox, tmp_path):
     root, data, cache = mixed_sandbox
-    window = MainWindow()
+    window = MainWindow(config_path=_cfg(tmp_path))
     window.show()
     qapp.processEvents()
     try:
@@ -260,7 +263,8 @@ def test_details_panel_matches_row_values(qapp, mixed_sandbox):
         assert dialog._reason_value.text() == cache_row["reason"]
 
         delete_buttons = [
-            w for w in dialog.findChildren(QPushButton)
+            w
+            for w in dialog.findChildren(QPushButton)
             if w is not dialog._close_button
         ]
         assert delete_buttons == []
@@ -269,9 +273,9 @@ def test_details_panel_matches_row_values(qapp, mixed_sandbox):
         window.deleteLater()
 
 
-def test_details_panel_relocalizes_on_language_switch(qapp, mixed_sandbox):
+def test_details_panel_relocalizes_on_language_switch(qapp, mixed_sandbox, tmp_path):
     root, data, cache = mixed_sandbox
-    window = MainWindow()
+    window = MainWindow(config_path=_cfg(tmp_path))
     window.show()
     qapp.processEvents()
     try:
@@ -300,7 +304,7 @@ def test_details_panel_relocalizes_on_language_switch(qapp, mixed_sandbox):
 
 def test_export_dialog_writes_validated_reports(qapp, mixed_sandbox, tmp_path):
     root, data, cache = mixed_sandbox
-    window = MainWindow()
+    window = MainWindow(config_path=_cfg(tmp_path))
     window.show()
     qapp.processEvents()
     try:
@@ -336,6 +340,48 @@ def test_export_dialog_writes_validated_reports(qapp, mixed_sandbox, tmp_path):
             window.statusBar().currentMessage()
             == window.controller.t("export_success", path=os.path.normpath(out))
         )
+    finally:
+        window.close()
+        window.deleteLater()
+
+
+def test_settings_dialog_applies_persists_and_restores_language(
+    qapp, mixed_sandbox, tmp_path
+):
+    cfg = _cfg(tmp_path)
+    window = MainWindow(config_path=cfg)
+    window.show()
+    qapp.processEvents()
+    try:
+        assert window.controller.i18n.lang == "en"
+
+        window._open_settings()
+        qapp.processEvents()
+        dlg = window._settings_dialog
+        assert dlg is not None and dlg.isVisible()
+        assert dlg._lang_label.text() == window.controller.t("settings_language")
+
+        dlg._lang_combo.setCurrentIndex(1)
+        qapp.processEvents()
+        assert window.controller.i18n.lang == "es"
+        assert window._table.horizontalHeaderItem(0).text() == "Carpeta"
+        assert window._lang_combo.currentData() == "es"
+        assert dlg._lang_label.text() == window.controller.t("settings_language")
+
+        from desktop_app.settings import AppSettings
+
+        assert AppSettings(cfg).load_language() == "es"
+
+        window.close()
+        window.deleteLater()
+
+        relaunched = MainWindow(config_path=cfg)
+        try:
+            assert relaunched.controller.i18n.lang == "es"
+            assert relaunched._table.horizontalHeaderItem(0).text() == "Carpeta"
+        finally:
+            relaunched.close()
+            relaunched.deleteLater()
     finally:
         window.close()
         window.deleteLater()

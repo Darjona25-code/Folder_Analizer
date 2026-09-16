@@ -27,6 +27,8 @@ from PySide6.QtWidgets import (
 from desktop_app.controller import DesktopController
 from desktop_app.details_dialog import DetailsDialog
 from desktop_app.export_dialog import ExportDialog
+from desktop_app.settings import AppSettings
+from desktop_app.settings_dialog import SettingsDialog
 from desktop_app.worker import ScanWorker
 from folder_analyzer.scanner import ScanCancellation
 from folder_analyzer.utils import format_size
@@ -51,9 +53,11 @@ _FILE_COL_KEYS = (
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, config_path: str | None = None):
         super().__init__(parent)
-        self.controller = DesktopController()
+        self._settings = AppSettings(config_path)
+        self._lang = self._settings.load_language()
+        self.controller = DesktopController(self._lang)
         self._worker = None
         self._result = None
         self._cancellation = None
@@ -63,6 +67,7 @@ class MainWindow(QMainWindow):
         self._details_item = None
         self._details_dialog = None
         self._export_dialog = None
+        self._settings_dialog = None
         self._build_ui()
         self._retranslate()
 
@@ -81,7 +86,7 @@ class MainWindow(QMainWindow):
         self._lang_combo = QComboBox(self)
         for code in ("en", "es"):
             self._lang_combo.addItem(code.upper(), code)
-        self._lang_combo.setCurrentIndex(0)
+        self._lang_combo.setCurrentIndex(0 if self._lang == "en" else 1)
         self._toolbar.addWidget(self._lang_combo)
         self._lang_combo.currentIndexChanged.connect(self._change_lang)
 
@@ -108,6 +113,10 @@ class MainWindow(QMainWindow):
         self._export_button.setEnabled(False)
         self._toolbar.addWidget(self._export_button)
         self._export_button.clicked.connect(self._open_export)
+
+        self._settings_button = QPushButton(self)
+        self._toolbar.addWidget(self._settings_button)
+        self._settings_button.clicked.connect(self._open_settings)
 
         self._delete_button = QPushButton(self)
         self._delete_button.setEnabled(False)
@@ -188,6 +197,7 @@ class MainWindow(QMainWindow):
         self._open_button.setText(t("desktop_open"))
         self._details_button.setText(t("desktop_details"))
         self._export_button.setText(t("btn_export"))
+        self._settings_button.setText(t("desktop_settings"))
         self._delete_button.setText(t("btn_recycle"))
         self._back_button.setText(t("desktop_back"))
         self._table.setHorizontalHeaderLabels([t(key) for key in _COL_KEYS])
@@ -204,7 +214,21 @@ class MainWindow(QMainWindow):
             self._path_input.setText(os.path.normpath(path))
 
     def _change_lang(self):
-        self._apply_lang(self._lang_combo.currentData())
+        self._apply_lang_and_save(self._lang_combo.currentData())
+
+    def _apply_lang_and_save(self, code):
+        self._apply_lang(code)
+        self._settings.save_language(code)
+        self._lang = code
+        if self._lang_combo.currentData() != code:
+            self._lang_combo.blockSignals(True)
+            self._lang_combo.setCurrentIndex(0 if code == "en" else 1)
+            self._lang_combo.blockSignals(False)
+        if (
+            self._settings_dialog is not None
+            and self._settings_dialog.isVisible()
+        ):
+            self._settings_dialog.retranslate(self.controller.t)
 
     def _apply_lang(self, code):
         self.controller.set_lang(code)
@@ -418,6 +442,22 @@ class MainWindow(QMainWindow):
                 ),
                 5000,
             )
+
+    # --- Phase 10: settings (S1-S2) -----------------------------------------
+
+    def _open_settings(self):
+        if (
+            self._settings_dialog is not None
+            and self._settings_dialog.isVisible()
+        ):
+            self._settings_dialog.raise_()
+            self._settings_dialog.activateWindow()
+            return
+        self._settings_dialog = SettingsDialog(
+            self.controller.t, current_lang=self._lang, parent=self
+        )
+        self._settings_dialog.language_changed.connect(self._apply_lang_and_save)
+        self._settings_dialog.show()
 
     def _populate_drill(self):
         self._file_rows = self.controller.file_rows(self._drill_folder)

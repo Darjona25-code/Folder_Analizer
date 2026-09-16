@@ -205,3 +205,25 @@ def test_export_requires_a_scanned_result(tmp_path):
     outcome = controller.export_report("json", str(tmp_path / "r.json"))
     assert outcome["status"] == "error"
     assert outcome["reason"] == "no_scan"
+
+
+def test_app_settings_persist_language(tmp_path):
+    from desktop_app.settings import AppSettings
+
+    cfg = tmp_path / "nested" / "cfg.json"
+    settings = AppSettings(str(cfg))
+    assert settings.load_language() == "en"
+
+    settings.save_language("es")
+    assert settings.load_language() == "es"
+    assert cfg.exists()
+
+    fresh = AppSettings(str(cfg))
+    assert fresh.load_language() == "es"
+
+    fresh.save_language("en")
+    assert AppSettings(str(cfg)).load_language() == "en"
+
+    unknown = AppSettings(str(tmp_path / "u.json"))
+    unknown._path.write_text('{"language": "xx"}', encoding="utf-8")
+    assert unknown.load_language() == "en"
