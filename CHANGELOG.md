@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (2026-09-16 — Phase 10 accepted)
+
+- **Phase 10 formally approved and closed by the user** (2026-09-16) after the
+  4-item residual evidence round: the export-timing artifact is now tracked as
+  `benchmarks/results/export_p10_desktop.json` (`docs(bench)` commit `cb9afd3`,
+  added past the ignore rule via `git add -f`); the 4 screenshots were proven as
+  real committed PNG blobs in `5017420` (1,212–6,054 bytes); the temp-path
+  evidence scripts were declared disposable one-off artifacts (the same facts
+  are permanently covered by the committed pytest tests); and the integrity
+  commitment was given in writing (raw output = actual fresh command output, or
+  an explicit statement that verbatim evidence is unavailable). Suite remains
+  397 passed / 2 skipped. Phases 11 and 12 remain NOT STARTED.
+
 ### Added (2026-09-15 — Phase 10 Desktop Application Complete)
 
 - **Drill-down file view** (D1–D5): the desktop table now opens any folder row

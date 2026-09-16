@@ -24,7 +24,7 @@ A disk space analyzer with two front-ends:
 - **Web UI** with a FastAPI backend (`api/`) + static frontend (`web/`): drive stats, sortable folder table, treemap, exports.
 - **Desktop UI** (Phase 9 → Phase 10) — native PySide6 app consuming the core in-process: scan table, drill-down per-folder file view, read-only reasons panel, JSON/CSV/HTML export (core exporter v2), language settings persisted under the user profile, identical safety/delete/I10 gates.
 
-### Phase 10 — Desktop Application Complete (SHIPPED 2026-09-15, awaiting acceptance)
+### Phase 10 — Desktop Application Complete (CLOSED / APPROVED 2026-09-16)
 
 - **Drill-down file view (D1–D5):** `QStackedWidget` top/drill pages; file rows
   sourced ONLY from `Scanner.retained_records_for` (zero re-classification);
@@ -49,8 +49,14 @@ A disk space analyzer with two front-ends:
 - **Engine frozen:** `git diff --stat c2320ad..HEAD` over `folder_analyzer/engine`,
   scanner.py, safety.py, security_guard.py, deleter.py is EMPTY.
 - **Suite:** 384 → **397 passed / 2 skipped** (+13 desktop tests). Commits
-  `232f704` → `bb75b7a` (5 Conventional Commits). Docs close (this commit):
-  README desktop section + screenshots, CHANGELOG, ARCHITECTURE, ROADMAP.
+  `232f704` → `bb75b7a` (5 Conventional Commits). Docs close: README desktop
+  section + screenshots, CHANGELOG, ARCHITECTURE, ROADMAP.
+- **Closure:** Phase 10 evidence accepted in full by the user (2026-09-16)
+  after the 4-item residual round: benchmark JSON committed and tracked
+  (`cb9afd3`, gitignored path lifted via `git add -f`), real screenshot byte
+  sizes proven from committed blobs, evidence scripts declared disposable
+  one-off artifacts, integrity commitment given in writing. Phase 9 status:
+  superseded by the approved Phase 10. Phases 11/12 remain NOT STARTED.
 
 ### Recent repairs (12 issues)
 
@@ -472,7 +478,7 @@ any other engine change out of bounds. Zero behavior change to outputs.
   written acceptance pending; next phase **NOT STARTED** and must not begin
   without explicit written approval.
 
-## Phase 9 — Desktop Architecture & Prototype (delivered 2026-09-15, awaiting acceptance)
+## Phase 9 — Desktop Architecture & Prototype (delivered 2026-09-15; superseded by the approved Phase 10)
 
 - **Approval:** the user restated the charter, the assistant returned an exact
   scope restatement (deliver / not-deliver / in-process rule / frozen-engine

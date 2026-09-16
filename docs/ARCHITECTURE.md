@@ -2,15 +2,15 @@
 
 Status: **Phase 10 — Desktop Application Complete** (drill-down, read-only
 reasons panel, export via core exporter v2, settings with language-only
-persistence, i18n live re-localization, cancellation) — delivered and submitted
-for acceptance (2026-09-15; suite 397 passed / 2 skipped, engine frozen, export
-re-measured on the 50k fixture). Phase 9 (PySide6 scaffold,
+persistence, i18n live re-localization, cancellation) — **CLOSED / APPROVED
+(2026-09-16)**; evidence accepted in full after the 4-item residual round
+(commit `cb9afd3` tracks the benchmark JSON). Phase 9 (PySide6 scaffold,
 ADR-001, core in-process, folder picker → scan → assessment table → gated
-delete, cancellation wired) was delivered and submitted for acceptance
-(2026-09-15). Phases 5 (recommendation engine + folder composition), 6
+delete, cancellation wired) was delivered (2026-09-15) and is superseded by
+the approved Phase 10. Phases 5 (recommendation engine + folder composition), 6
 (Exports v2), 7 (Web UI + single-source i18n) and 8 (Performance & Scale,
-pre-acceptance blockers closed 2026-09-14) are closed/approved. Phases 9/10
-await the user's formal written acceptance before any next-phase work. This
+pre-acceptance blockers closed 2026-09-14) are closed/approved. Phases 11 and 12
+are NOT STARTED and require the user's explicit written go-ahead. This
 document contains the core/interface boundary, the current module map, the
 CLI/Web/Desktop relationship, the desktop section (§3c), and the benchmark
 table.
