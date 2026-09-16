@@ -765,7 +765,9 @@ Phases 1–8 are complete and approved. Phase 9 is delivered (2026-09-15), super
   process via UI Automation (disposable probe, isolated `APPDATA`, one-off,
   NOT committed): the same running window re-rendered in place — title
   `Folder Analyzer`→`Analizador de Carpetas`, column headers `Folder`→`Carpeta`
-  (col_name `Name`→`Nombre`, `Size`→`Tamano`, …), status bar `Ready`→`Listo`,
+  (col_name `Name`→`Nombre`, `Size`→`Tamano`, `Files`→`Archivos`,
+  `Recommendation`→`Recomendacion`, `Confidence`→`Confianza`, `Impact`→
+  `Impacto`, `Reason`→`Motivo`), status bar `Ready`→`Listo`,
   buttons `Scan`→`Escanear` — and persisted `{"language":"es"}` live.
   Regression coverage added to the committed suite:
   `tests/test_desktop_live_relocalization.py` — source-level, same `I18n`

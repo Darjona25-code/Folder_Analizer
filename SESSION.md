@@ -90,7 +90,9 @@ A disk space analyzer with two front-ends:
   Automation from another process (disposable probe `l2_probe_artifact.py`,
   isolated `APPDATA`, one-off, not committed) switched EN→ES→EN without
   restart — title `Folder Analyzer`→`Analizador de Carpetas`, headers `Folder,
-  Size, …`→`Carpeta, Tamano, …` (col_name `Name`→`Nombre`), status `Ready`→
+  Size, Files, Recommendation, Confidence, Impact, Reason`→`Carpeta, Tamano,
+  Archivos, Recomendacion, Confianza, Impacto, Motivo` (col_name `Name`→
+  `Nombre`), status `Ready`→
   `Listo`, buttons `Scan`→`Escanear`; the live frozen process persisted
   `{"language":"es"}`. Committed regression test
   `tests/test_desktop_live_relocalization.py` locks the same-instance mutation
