@@ -110,3 +110,124 @@ def test_offscreen_cancelled_scan_shows_partial_notice(qapp, mixed_sandbox):
     finally:
         window.close()
         window.deleteLater()
+
+
+def test_drill_down_shows_retained_files_with_i10_gates(qapp, mixed_sandbox):
+    root, data, cache = mixed_sandbox
+    window = MainWindow()
+    window.show()
+    qapp.processEvents()
+    try:
+        window._path_input.setText(root)
+        window._start_scan()
+        _wait_for_scan(window, qapp)
+        assert window._result.cancelled is False
+
+        window.show_drill_down(data)
+        qapp.processEvents()
+        assert window._file_table.rowCount() == 1
+        assert window._file_table.item(0, 0).text() == "notes.txt"
+        assert window._open_button.isEnabled() is False
+
+        window._file_table.selectRow(0)
+        qapp.processEvents()
+        assert window._delete_button.isEnabled() is False
+
+        window.show_drill_down(cache)
+        qapp.processEvents()
+        assert window._file_table.rowCount() == 2
+        names = [
+            window._file_table.item(i, 0).text() for i in range(2)
+        ]
+        assert set(names) == {"a.tmp", "b.tmp"}
+
+        window._file_table.clearSelection()
+        row = next(
+            i
+            for i in range(2)
+            if window._file_table.item(i, 0).text() == "a.tmp"
+        )
+        window._file_table.selectRow(row)
+        qapp.processEvents()
+        assert window._delete_button.isEnabled() is True
+
+        window._back_to_top()
+        qapp.processEvents()
+        assert window._stack.currentWidget() is window._top_page
+        cache_row_on_top = next(
+            i
+            for i in range(window._table.rowCount())
+            if window._table.item(i, 0).data(Qt.UserRole)
+            == os.path.normpath(cache)
+        )
+        window._table.selectRow(cache_row_on_top)
+        qapp.processEvents()
+        assert window._open_button.isEnabled() is True
+    finally:
+        window.close()
+        window.deleteLater()
+
+
+def test_drill_down_evicted_folder_shows_folder_level_notice(qapp, mixed_sandbox):
+    root, data, cache = mixed_sandbox
+    bulk = os.path.join(root, "bulk")
+    os.makedirs(bulk)
+    for i in range(240):
+        with open(os.path.join(bulk, f"junk{i:03d}.bak"), "w", encoding="utf-8") as fh:
+            fh.write("x")
+
+    from folder_analyzer.engine.retention import RetentionConfig
+
+    window = MainWindow()
+    window.show()
+    qapp.processEvents()
+    try:
+        result = window.controller.scan(
+            root, retention=RetentionConfig(global_budget=1)
+        )
+        window._on_scan_finished(result)
+        qapp.processEvents()
+
+        window.show_drill_down(bulk)
+        qapp.processEvents()
+        assert window._file_table.rowCount() == 0
+        assert window._evicted_notice.isVisible()
+        assert window._evicted_notice.text() == window.controller.t("records_evicted")
+    finally:
+        window.close()
+        window.deleteLater()
+
+
+def test_drill_down_relocalizes_on_language_switch(qapp, mixed_sandbox):
+    root, data, cache = mixed_sandbox
+    window = MainWindow()
+    window.show()
+    qapp.processEvents()
+    try:
+        window._path_input.setText(root)
+        window._start_scan()
+        _wait_for_scan(window, qapp)
+        assert window._result.cancelled is False
+
+        window.show_drill_down(cache)
+        qapp.processEvents()
+        assert window._file_table.horizontalHeaderItem(0).text() == "Name"
+
+        window._lang_combo.setCurrentIndex(1)
+        qapp.processEvents()
+        assert window.controller.i18n.lang == "es"
+        assert (
+            window._file_table.horizontalHeaderItem(0).text()
+            == window.controller.t("col_name")
+        )
+        assert window._file_table.item(0, 5).text()
+
+        window._lang_combo.setCurrentIndex(0)
+        qapp.processEvents()
+        assert (
+            window._file_table.horizontalHeaderItem(0).text()
+            == window.controller.t("col_name")
+        )
+    finally:
+        window.close()
+        window.deleteLater()

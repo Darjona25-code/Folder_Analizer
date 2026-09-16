@@ -1,4 +1,9 @@
-"""Desktop main window (PySide6). Thin view over DesktopController."""
+"""Desktop main window (PySide6). Thin view over DesktopController.
+
+Phase 9 shipped the scaffold; Phase 10 adds drill-down navigation on top of
+the assessment table (D1-D5). All user-facing strings come from the
+single-source locale files and the delete matrix / I10 hold in every surface.
+"""
 
 import os
 
@@ -11,6 +16,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
     QToolBar,
@@ -32,6 +38,14 @@ _COL_KEYS = (
     "col_impact",
     "col_reason",
 )
+_FILE_COL_KEYS = (
+    "col_name",
+    "col_size",
+    "col_recommendation",
+    "col_confidence",
+    "col_impact",
+    "col_reason",
+)
 
 
 class MainWindow(QMainWindow):
@@ -41,6 +55,9 @@ class MainWindow(QMainWindow):
         self._worker = None
         self._result = None
         self._cancellation = None
+        self._drill_folder = None
+        self._folder_rows = []
+        self._file_rows = []
         self._build_ui()
         self._retranslate()
 
@@ -59,6 +76,7 @@ class MainWindow(QMainWindow):
         self._lang_combo = QComboBox(self)
         for code in ("en", "es"):
             self._lang_combo.addItem(code.upper(), code)
+        self._lang_combo.setCurrentIndex(0)
         self._toolbar.addWidget(self._lang_combo)
         self._lang_combo.currentIndexChanged.connect(self._change_lang)
 
@@ -71,13 +89,20 @@ class MainWindow(QMainWindow):
         self._toolbar.addWidget(self._cancel_button)
         self._cancel_button.clicked.connect(self._cancel_scan)
 
+        self._open_button = QPushButton(self)
+        self._open_button.setEnabled(False)
+        self._toolbar.addWidget(self._open_button)
+        self._open_button.clicked.connect(self._open_drill_down)
+
         self._delete_button = QPushButton(self)
         self._delete_button.setEnabled(False)
         self._toolbar.addWidget(self._delete_button)
         self._delete_button.clicked.connect(self._run_delete)
 
-        central = QWidget(self)
-        layout = QVBoxLayout(central)
+        self._stack = QStackedWidget(self)
+
+        top_page = QWidget(self)
+        top_layout = QVBoxLayout(top_page)
 
         self._notice = QLabel(self)
         self._notice.setWordWrap(True)
@@ -85,7 +110,7 @@ class MainWindow(QMainWindow):
             "color: #b00020; font-weight: bold; background: #fdecea; padding: 6px;"
         )
         self._notice.hide()
-        layout.addWidget(self._notice)
+        top_layout.addWidget(self._notice)
 
         self._table = QTableWidget(0, len(_COL_KEYS), self)
         self._table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -96,10 +121,46 @@ class MainWindow(QMainWindow):
         self._table.setColumnWidth(0, 240)
         self._table.setColumnWidth(1, 90)
         self._table.setColumnWidth(2, 70)
-        self._table.itemSelectionChanged.connect(self._update_delete_state)
-        layout.addWidget(self._table)
+        self._table.itemSelectionChanged.connect(self._update_action_state)
+        top_layout.addWidget(self._table)
 
-        self.setCentralWidget(central)
+        self._stack.addWidget(top_page)
+        self._top_page = top_page
+
+        drill_page = QWidget(self)
+        drill_layout = QVBoxLayout(drill_page)
+
+        self._back_button = QPushButton(self)
+        self._back_button.clicked.connect(self._back_to_top)
+        drill_layout.addWidget(self._back_button)
+
+        self._drill_title = QLabel(self)
+        self._drill_title.setWordWrap(True)
+        drill_layout.addWidget(self._drill_title)
+
+        self._evicted_notice = QLabel(self)
+        self._evicted_notice.setWordWrap(True)
+        self._evicted_notice.setStyleSheet(
+            "color: #b00020; font-weight: bold; background: #fdecea; padding: 6px;"
+        )
+        self._evicted_notice.hide()
+        drill_layout.addWidget(self._evicted_notice)
+
+        self._file_table = QTableWidget(0, len(_FILE_COL_KEYS), self)
+        self._file_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self._file_table.setSelectionMode(QTableWidget.ExtendedSelection)
+        self._file_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self._file_table.verticalHeader().setVisible(False)
+        self._file_table.horizontalHeader().setStretchLastSection(True)
+        self._file_table.setColumnWidth(0, 240)
+        self._file_table.setColumnWidth(1, 90)
+        self._file_table.itemSelectionChanged.connect(self._update_action_state)
+        drill_layout.addWidget(self._file_table)
+
+        self._stack.addWidget(drill_page)
+        self._drill_page = drill_page
+
+        self.setCentralWidget(self._stack)
         self.resize(960, 520)
 
     def _retranslate(self):
@@ -109,8 +170,13 @@ class MainWindow(QMainWindow):
         self._path_input.setPlaceholderText(t("scan_placeholder"))
         self._scan_button.setText(t("btn_scan"))
         self._cancel_button.setText(t("btn_cancel"))
+        self._open_button.setText(t("desktop_open"))
         self._delete_button.setText(t("btn_recycle"))
+        self._back_button.setText(t("desktop_back"))
         self._table.setHorizontalHeaderLabels([t(key) for key in _COL_KEYS])
+        self._file_table.setHorizontalHeaderLabels(
+            [t(key) for key in _FILE_COL_KEYS]
+        )
         self.statusBar().showMessage(t("desktop_status_ready"))
 
     def _pick_folder(self):
@@ -121,15 +187,21 @@ class MainWindow(QMainWindow):
             self._path_input.setText(os.path.normpath(path))
 
     def _change_lang(self):
-        code = self._lang_combo.currentData()
+        self._apply_lang(self._lang_combo.currentData())
+
+    def _apply_lang(self, code):
         self.controller.set_lang(code)
         self._retranslate()
+        if self._stack.currentWidget() is self._drill_page:
+            self._populate_drill()
+        self._update_action_state()
 
     def _start_scan(self):
         path = self._path_input.text().strip()
         if not path:
             self.statusBar().showMessage(self.controller.t("empty_table_message"), 5000)
             return
+        self._stack.setCurrentWidget(self._top_page)
         self._scan_button.setEnabled(False)
         self._set_notice(None)
         self._table.setRowCount(0)
@@ -151,6 +223,7 @@ class MainWindow(QMainWindow):
 
     def _on_scan_finished(self, result):
         self._result = result
+        self._stack.setCurrentWidget(self._top_page)
         self._populate()
         self._scan_button.setEnabled(True)
         self._cancel_button.setEnabled(False)
@@ -176,6 +249,7 @@ class MainWindow(QMainWindow):
                 ),
                 5000,
             )
+        self._update_action_state()
         self._cleanup_worker()
 
     def _on_scan_failed(self, message):
@@ -194,6 +268,7 @@ class MainWindow(QMainWindow):
 
     def _populate(self):
         rows = self.controller.rows(self._result)
+        self._folder_rows = rows
         self._table.setRowCount(len(rows))
         for i, row in enumerate(rows):
             values = (
@@ -213,15 +288,98 @@ class MainWindow(QMainWindow):
                     item.setToolTip(row["path"])
                 self._table.setItem(i, col, item)
 
-    def _update_delete_state(self):
-        enabled = False
+    # --- Phase 10: drill-down navigation (D1-D5) --------------------------
+
+    def show_drill_down(self, path):
+        self._drill_folder = os.path.normpath(path)
+        self._stack.setCurrentWidget(self._drill_page)
+        self._populate_drill()
+        self._update_action_state()
+
+    def _open_drill_down(self):
+        path = self._selected_folder_path()
+        if path:
+            self.show_drill_down(path)
+
+    def _back_to_top(self):
+        self._stack.setCurrentWidget(self._top_page)
+        self._update_action_state()
+
+    def _selected_folder_path(self):
         for item in self._table.selectedItems():
-            if item.column() == 0 and item.data(Qt.UserRole + 1):
-                enabled = True
-                break
-        self._delete_button.setEnabled(enabled)
+            if item.column() == 0:
+                return item.data(Qt.UserRole)
+        return None
+
+    def _selected_file_path(self):
+        for item in self._file_table.selectedItems():
+            if item.column() == 0:
+                return item.data(Qt.UserRole)
+        return None
+
+    def _populate_drill(self):
+        self._file_rows = self.controller.file_rows(self._drill_folder)
+        self._drill_title.setText(
+            self.controller.t("folder_files_title", path=self._drill_folder)
+        )
+        rows = self._file_rows
+        self._file_table.setRowCount(len(rows))
+        for i, row in enumerate(rows):
+            values = (
+                row["name"],
+                row["size"],
+                row["rec_label"],
+                row["conf_label"],
+                row["imp_label"],
+                row["reason"],
+            )
+            for col, text in enumerate(values):
+                item = QTableWidgetItem(str(text))
+                if col == 0:
+                    item.setData(Qt.UserRole, row["path"])
+                    item.setData(Qt.UserRole + 1, row["action"])
+                    item.setToolTip(row["path"])
+                self._file_table.setItem(i, col, item)
+        if self.controller.is_evicted(self._drill_folder):
+            self._evicted_notice.setText(self.controller.t("records_evicted"))
+            self._evicted_notice.show()
+        elif not rows:
+            self._evicted_notice.setText(self.controller.t("desktop_no_files"))
+            self._evicted_notice.show()
+        else:
+            self._evicted_notice.hide()
+
+    # --- Delete matrix (DM) across top table and drill-down -----------------
+
+    def _update_action_state(self):
+        deletable = False
+        openable = False
+        if self._stack.currentWidget() is self._drill_page:
+            for item in self._file_table.selectedItems():
+                if item.column() == 0:
+                    if item.data(Qt.UserRole + 1):
+                        deletable = True
+                    break
+            self._open_button.setEnabled(False)
+        else:
+            for item in self._table.selectedItems():
+                if item.column() == 0:
+                    if item.data(Qt.UserRole + 1):
+                        deletable = True
+                    openable = True
+                    break
+            self._open_button.setEnabled(
+                openable and self._result is not None
+            )
+        self._delete_button.setEnabled(deletable)
 
     def _run_delete(self):
+        if self._stack.currentWidget() is self._drill_page:
+            self._run_file_delete()
+        else:
+            self._run_folder_delete()
+
+    def _run_folder_delete(self):
         selected = {
             item.data(Qt.UserRole)
             for item in self._table.selectedItems()
@@ -244,7 +402,7 @@ class MainWindow(QMainWindow):
         blocked = 0
         if attempts:
             results = self.controller.delete_folders(
-                attempts, confirm=self._confirm_delete
+                attempts, confirm=self._confirm_delete_folder
             )
             for outcome in results:
                 if outcome["status"] == "deleted":
@@ -260,21 +418,81 @@ class MainWindow(QMainWindow):
                         ),
                         5000,
                     )
-        total_blocked = blocked + skipped
-        if total_blocked or deleted:
+        if blocked + skipped or deleted:
             self.statusBar().showMessage(
                 self.controller.t(
-                    "toast_delete_blocked", b=total_blocked, d=deleted
+                    "toast_delete_blocked", b=blocked + skipped, d=deleted
                 ),
                 5000,
             )
-        self._update_delete_state()
+        self._update_action_state()
 
-    def _confirm_delete(self, path) -> bool:
+    def _run_file_delete(self):
+        selected = {
+            item.data(Qt.UserRole)
+            for item in self._file_table.selectedItems()
+            if item.column() == 0 and item.data(Qt.UserRole)
+        }
+        attempts = []
+        skipped = 0
+        for path in selected:
+            enabled = any(
+                item.column() == 0
+                and item.data(Qt.UserRole) == path
+                and item.data(Qt.UserRole + 1)
+                for item in self._file_table.selectedItems()
+            )
+            if not enabled:
+                skipped += 1
+                continue
+            attempts.append(path)
+        deleted = 0
+        blocked = 0
+        if attempts:
+            results = self.controller.delete_files(
+                attempts, confirm=self._confirm_delete_file
+            )
+            for outcome in results:
+                if outcome["status"] == "deleted":
+                    deleted += 1
+                elif outcome["status"] == "blocked":
+                    blocked += 1
+                elif outcome["status"] == "error":
+                    self.statusBar().showMessage(
+                        self.controller.t(
+                            "delete_failed",
+                            path=outcome["path"],
+                            error=outcome["reason"],
+                        ),
+                        5000,
+                    )
+        if deleted and not (blocked + skipped):
+            self.statusBar().showMessage(
+                self.controller.t("deleted_files", count=deleted), 5000
+            )
+        elif deleted or blocked + skipped:
+            self.statusBar().showMessage(
+                self.controller.t(
+                    "toast_delete_blocked", b=blocked + skipped, d=deleted
+                ),
+                5000,
+            )
+        self._populate_drill()
+        self._update_action_state()
+
+    def _confirm_delete_folder(self, path) -> bool:
         answer = QMessageBox.question(
             self,
             self.controller.t("confirm_delete_title"),
             self.controller.t("confirm_folder_body"),
+        )
+        return answer == QMessageBox.StandardButton.Yes
+
+    def _confirm_delete_file(self, path) -> bool:
+        answer = QMessageBox.question(
+            self,
+            self.controller.t("confirm_delete_title"),
+            self.controller.t("confirm_file_body"),
         )
         return answer == QMessageBox.StandardButton.Yes
 
