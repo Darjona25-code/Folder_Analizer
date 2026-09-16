@@ -58,6 +58,15 @@ single-source locales (`en.json` / `es.json`) bundled inside the artifact.
   sandbox) and writes a JSON report. The delete boundary and I10 gates are
   executed from the built artifact, not from source.
 
+> **Note (deliberate user decision, Phase 11):** the installer **is not signed**
+> with a code-signing certificate (per-user, `PrivilegesRequired=lowest`, no
+> admin prompt). On first launch, Windows SmartScreen will show **"Unknown
+> Publisher"** and may block the installer until you click **More info → Run
+> anyway**. The generated `FolderAnalyzer.exe` bundle itself is a plain
+> unpacked-archive layout inside the install dir — treat downloads carefully
+> and prefer building from source when full trust is needed. This is a known,
+> accepted trade-off; a code-signing certificate is not currently in scope.
+
 The CLI is unaffected by packaging: it continues to be distributed via the
 wheel / `folder-analyzer` console entry point only.
 

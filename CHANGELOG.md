@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   → `dist/FolderAnalyzer-Setup-3.0.0.exe`; silent install/uninstall verified
   (install exit 0, installed tree 121,218,225 B, uninstall exit 0, dir
   removed); the installed output runs the self-test standalone (exit 0).
+- **Unsigned installer (deliberate decision):** the setup is NOT code-signed,
+  per the user's explicit "ship unsigned" decision. SmartScreen will show
+  "Unknown Publisher" on first run (workaround: More info → Run anyway).
+  Documented in README ("Desktop app — packaged build & installer").
 - **Artifact self-test** (`desktop_app/selftest.py`, `--selftest <report>`):
   in-bundle verification of version, bundled locales, scan, I10 folder/file
   gates, and the six-condition guarded delete (`blocked` / `cancelled` /
