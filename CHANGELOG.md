@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (2026-09-16 — Phase 11 Packaging & Installer)
+
+- **Version 3.0.0 (R6).** `pyproject.toml`, `folder_analyzer/__init__.py` and
+  `api/main.py` now declare `3.0.0`. **Deliberate version-ahead-of-tag
+  sequencing, per ROADMAP §18:** the *string* is 3.0.0 while **no `v3.0.0` git
+  tag exists yet** — the tag is applied by default only at Phase 12. This is
+  not an inconsistency.
+- **PyInstaller onedir bundle** (`packaging/FolderAnalyzer.spec`): desktop app
+  only; `console=False`; entry `FolderAnalyzer.exe`. Output
+  `dist/FolderAnalyzer/` (exe 2,442,001 B; tree 116,718,796 B / 172 files;
+  measured). `folder_analyzer/` is consumed in-process (ADR-001); the core is
+  not rearranged for the bundle.
+- **Locales bundled** inside the artifact (`_internal/folder_analyzer/locales/
+  {en,es}.json`): verified loadable from the frozen exe (127 keys per locale,
+  EN/ES parity, strings resolve — `en col_name='Name'`, `es 'Nombre'`).
+- **Installer (R2/R3):** Inno Setup 6 script `packaging/folder-analyzer.iss`
+  → `dist/FolderAnalyzer-Setup-3.0.0.exe`; silent install/uninstall verified
+  (install exit 0, installed tree 121,218,225 B, uninstall exit 0, dir
+  removed); the installed output runs the self-test standalone (exit 0).
+- **Artifact self-test** (`desktop_app/selftest.py`, `--selftest <report>`):
+  in-bundle verification of version, bundled locales, scan, I10 folder/file
+  gates, and the six-condition guarded delete (`blocked` / `cancelled` /
+  `deleted` via real `send2trash`) — run against the built exe AND the
+  installer-installed output, with Python off the `PATH`. Mirrored in-repo by
+  `tests/test_desktop_selftest.py` (Recycle Bin short-circuited).
+- **Wheel stays the CLI path (R1):** `pip` wheel at 3.0.0 (locale
+  `package-data` declared); fresh-venv install verified — import resolves from
+  site-packages, CLI `folder-analyzer.exe` scan+quit works, and the **full
+  suite runs from the wheel: 398 passed, 2 skipped** (source: 398 passed, 2
+  skipped). `api/` + `web/` are imported from a source copy because they are
+  not part of the wheel distribution (unchanged from v2.0.0).
+- **Engine frozen throughout:** `git diff --stat` over
+  `folder_analyzer/engine`, `folder_analyzer/scanner.py`, `safety.py`,
+  `security_guard.py`, `deleter.py` between Phase 10 HEAD and the phase close
+  is EMPTY.
+
 ### Changed (2026-09-16 — Phase 10 accepted)
 
 - **Phase 10 formally approved and closed by the user** (2026-09-16) after the

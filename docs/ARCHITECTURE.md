@@ -7,10 +7,17 @@ persistence, i18n live re-localization, cancellation) — **CLOSED / APPROVED
 (commit `cb9afd3` tracks the benchmark JSON). Phase 9 (PySide6 scaffold,
 ADR-001, core in-process, folder picker → scan → assessment table → gated
 delete, cancellation wired) was delivered (2026-09-15) and is superseded by
-the approved Phase 10. Phases 5 (recommendation engine + folder composition), 6
+the approved Phase 10. **Phase 11 — Packaging & Installer** (PyInstaller
+onedir bundle of the desktop app + Inno Setup installer, locales bundled,
+`--selftest` artifact verification, version 3.0.0) is **DELIVERED — submitted
+for acceptance (2026-09-16)**: packaging scripts live under `packaging/`;
+the wheel remains the CLI's only distribution path; the engine is untouched
+(empty diff over the protected paths); suite 398 passed / 2 skipped from
+source and from the installed wheel. Phases 5 (recommendation engine +
+folder composition), 6
 (Exports v2), 7 (Web UI + single-source i18n) and 8 (Performance & Scale,
-pre-acceptance blockers closed 2026-09-14) are closed/approved. Phases 11 and 12
-are NOT STARTED and require the user's explicit written go-ahead. This
+pre-acceptance blockers closed 2026-09-14) are closed/approved. Phase 12 is
+NOT STARTED and requires the user's explicit written go-ahead. This
 document contains the core/interface boundary, the current module map, the
 CLI/Web/Desktop relationship, the desktop section (§3c), and the benchmark
 table.

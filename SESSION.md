@@ -56,7 +56,46 @@ A disk space analyzer with two front-ends:
   (`cb9afd3`, gitignored path lifted via `git add -f`), real screenshot byte
   sizes proven from committed blobs, evidence scripts declared disposable
   one-off artifacts, integrity commitment given in writing. Phase 9 status:
-  superseded by the approved Phase 10. Phases 11/12 remain NOT STARTED.
+  superseded by the approved Phase 10.
+
+### Phase 11 — Packaging & Installer (DELIVERED 2026-09-16, awaiting acceptance)
+
+- **PyInstaller onedir bundle of the desktop app only** (R1: CLI packaging and
+  the wheel/entry-point mechanism untouched). `packaging/FolderAnalyzer.spec`:
+  `console=False`, locales added as data at `folder_analyzer/locales` (the
+  exact dir the frozen `i18n.load_locales()` looks up relative to `__file__`),
+  core consumed in-process (ADR-001). Output `dist/FolderAnalyzer/`: exe
+  2,442,001 B, tree 116,718,796 B / 172 files.
+- **Installer MANDATORY (R2, R3):** Inno Setup 6.7.3 (per-user at
+  `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`) — `packaging/
+  folder-analyzer.iss` → `dist/FolderAnalyzer-Setup-3.0.0.exe`. Silent
+  install into a fresh dir (exit 0; installed tree 121,218,225 B; locales
+  present), installed-output `--selftest` exit 0 passed=true with Python off
+  the PATH, silent uninstall exit 0 (dir removed).
+- **Version 3.0.0 (R6):** `pyproject.toml`, `folder_analyzer/__init__.py`,
+  `api/main.py`. DELIBERATE ahead-of-tag: string 3.0.0 with NO `v3.0.0` tag
+  until Phase 12 (ROADMAP §18). Locale `package-data` declared so the wheel
+  carries `folder_analyzer/locales/{en,es}.json`.
+- **`--selftest <report>`** (`desktop_app/selftest.py`): in-bundle checks —
+  version, bundled locales (load/parity/resolve), scan, I10 folder+file gates,
+  six-condition guarded delete (blocked/cancelled/deleted via real
+  `send2trash`). Runs against the frozen exe and the installer output with the
+  dev env off the `PATH`. Mirrored by `tests/test_desktop_selftest.py` with the
+  Recycle Bin short-circuited (`FA_SELFTEST_FAKE_TRASH=1`). Classification
+  harness mirrors `conftest.classification_neutral_env` (real machine env
+  reclassifies everything otherwise).
+- **Full suite from the wheel** in a fresh venv: built
+  `folder_analyzer-3.0.0-py3-none-any.whl`, installed into a clean venv, CLI
+  `folder-analyzer.exe` scan+quit works, `folder_analyzer`/`desktop_app`
+  resolve from site-packages; pytest from a temp copy of `tests/`+`api/`+`web/`
+  → **398 passed / 2 skipped** (identical to source; api/web imported from the
+  source copy because the wheel intentionally does not ship them).
+- **Engine frozen:** `git diff --stat` over `folder_analyzer/engine`,
+  scanner.py, safety.py, security_guard.py, deleter.py from Phase 10 HEAD to
+  the phase close is EMPTY.
+- **Commits:** `c54efb3` (version 3.0.0 + locale package-data) → `c37fa63`
+  (artifact self-test) → `e641116` (PyInstaller spec + Inno Setup script +
+  build_desktop.ps1) → `docs(pkg)` close. Awaits explicit written acceptance.
 
 ### Recent repairs (12 issues)
 
@@ -67,7 +106,7 @@ Root-folder exclusion and scan-root deletion protection (CLI + API), clean EOF h
 - Python 3.10+ (tested on 3.12)
 - Rich (terminal UI), send2trash (Recycle Bin), psutil (disk info)
 - FastAPI + Uvicorn (web), httpx (API testing)
-- pytest — 397 tests passing (2 skipped) at Phase 10 close
+- pytest — 398 tests passing (2 skipped) at Phase 11 close (397 at Phase 10 close)
 
 ### To continue development
 

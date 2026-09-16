@@ -41,6 +41,26 @@ This installs the `folder-analyzer` command. Alternatively `pip install -r requi
 
 > **Note:** the FastAPI Web UI (`api/`) and its frontend (`web/`) are currently run **from the source tree**; they are not bundled into the wheel distribution.
 
+### Desktop app — packaged build & installer (Windows)
+
+Since **v3.0.0** the desktop app ships as a PyInstaller **onedir bundle**
+(`dist/FolderAnalyzer/`, entry `FolderAnalyzer.exe`) and as an Inno Setup
+installer (`dist/FolderAnalyzer-Setup-3.0.0.exe`, installed under
+`%LOCALAPPDATA%\Programs\FolderAnalyzer`, uninstaller included). The frozen
+bundle runs standalone — no Python, venv, or `pip` required — and carries the
+single-source locales (`en.json` / `es.json`) bundled inside the artifact.
+
+- Build from source: `python -m PyInstaller --noconfirm --clean --distpath dist --workpath build packaging/FolderAnalyzer.spec`
+- Installer: `packaging/build_desktop.ps1` (PyInstaller + `ISCC.exe` for Inno Setup 6)
+- Packaged-app verification: `FolderAnalyzer.exe --selftest <report.json>` runs
+  the in-bundle checks (version, bundled locales + key parity, scan, the I10
+  folder/file gates, and the six-condition guarded delete against a throwaway
+  sandbox) and writes a JSON report. The delete boundary and I10 gates are
+  executed from the built artifact, not from source.
+
+The CLI is unaffected by packaging: it continues to be distributed via the
+wheel / `folder-analyzer` console entry point only.
+
 ## CLI Usage
 
 ```bash
@@ -121,7 +141,8 @@ Run from the source tree (PySide6 must be installed — `pip install -e ".[deskt
 python -m desktop_app
 ```
 
-or via the `folder-analyzer-desktop` script. Pick a folder, scan, then use the
+or via the `folder-analyzer-desktop` script, or the packaged
+`FolderAnalyzer.exe` (see Installation → Desktop app). Pick a folder, scan, then use the
 table the same way as the web UI: rows are sorted by size with a localized
 recommendation / confidence / impact / reason; **Open** drills into a folder's
 retained files, **Details** opens a read-only reasons panel, **Export** writes a
@@ -164,6 +185,8 @@ Folder_Analizer/
 │   ├── export_dialog.py       # JSON/CSV/HTML export (core exporter v2)
 │   ├── settings.py            # Language-only persistence (user profile)
 │   └── settings_dialog.py     # Language settings dialog
+├── packaging/                 # Phase 11: PyInstaller spec + Inno Setup script
+├── tests/                     # 398 unit + integration tests (2 skipped)
 ├── api/                       # FastAPI backend (Web UI)
 │   ├── main.py                # App + static file mounting + entry point
 │   ├── routes.py              # REST endpoints
@@ -174,7 +197,7 @@ Folder_Analizer/
 │   ├── css/style.css
 │   ├── js/app.js
 │   └── assets/                # Branding (Caza Bytes)
-├── tests/                     # 397 unit + integration tests (2 skipped)
+├── tests/                     # 398 unit + integration tests (2 skipped)
 ├── docs/                      # Roadmap, architecture, safety, ADR, screenshots
 ├── requirements.txt
 ├── pyproject.toml

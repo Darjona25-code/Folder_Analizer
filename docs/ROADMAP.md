@@ -2,7 +2,7 @@
 
 Status: **APPROVED — Phases 1–8 complete. Phase 8 (Performance & Scale) delivered and accepted in substance (2026-09-15; two pre-acceptance blockers closed in commits `552625b` + `dfce81e`): O1 single `_policy_for` + inlined bucket, O2 bounded per-folder filename verdict cache, core `ScanCancellation` wired to `POST /api/scan/cancel` and **surfaced end-to-end** (API `ScanResponse.cancelled`, CLI PARTIAL notice, additive v2 export markers, web UI localized notice), reproducible benchmark harness (fixed `--affinity` mask, KB µs/file, cancel probe). Suite **375 passed / 2 skipped** (369 delivery + 6 blocker tests). Raw smoke `t_scan` 0.309–0.311 s (−13.6% same-mask vs Phase-7 state), export t_scan 0.3549 s (−7.6%), KB dispatch 2.4–2.7 µs/file, gate 0.26 MiB / 7,400 @ +0%, export bytes byte-identical, cancellation stops ≈8 ms after request; the archival "2.1 s on mask 0x3" figure is **retracted** (ARCHITECTURE §6c dated correction: 0x3 re-measures 0.324–0.351 s at HEAD, no P-core identity drift). Evidence: ARCHITECTURE §6c + `benchmarks/results/smoke_p8_*.json`. Phase 7 (Web UI + single-source i18n) delivered and submitted for acceptance: single-source `locales/{en,es}.json` (ui + reasons namespaces) consumed by CLI/API/exports/Web UI, schema-v2 API surfaces, I10 folder/file gating, zero re-classification. All 6 verification points answered with evidence (2026-09-14, commit `09e38eb`: new HEAD benchmark side-by-side, I10 `rec`/`deletable` per-item proof, `retained_records_for` no-reanalyze test, `reason_params` interpolation through the real API→UI path, engine `git diff` clean except sanctioned `explain.py`). Phase 9 (Desktop Architecture & Prototype — PySide6 scaffold, ADR-001, core **in-process**, pick → scan → assessment table → gated delete, cancellation wired) **delivered and submitted for acceptance (2026-09-15)**; suite **384 passed / 2 skipped** (375 + 9 desktop tests: Qt-free controller units + offscreen smoke). Commits: `2ea97dd` (ADR) → `605bf90` (scaffold) → `59543e9` (in-process scan + assessment table) → `c130245` (gated delete + cancellation wiring) → `329d90b` (offscreen smoke + controller unit tests) → Phase 9 docs close. Proof: `docs/ADR-001-desktop-stack.md`, ARCHITECTURE §3c, quoted desktop tests, empty engine diff. **Phase 9 delivered (2026-09-15); superseded by the Phase 10 acceptance.**
 
-**Phase 10 (Desktop Application Complete - drill-down, read-only reasons panel, export via core exporter v2, settings with language-only persistence, i18n live re-localization, cancellation) DELIVERED and submitted for acceptance (2026-09-15). Suite 397 passed / 2 skipped (384 Phase-9 close + 13 Phase-10 tests). Commits `232f704` -> `bb75b7a`. Engine frozen across Phase 10 (empty `git diff --stat` over `folder_analyzer/engine`, scanner.py, safety.py, security_guard.py, deleter.py). Export re-measured on the same 50k fixture through the desktop path: JSON 2.16 / CSV 0.63 / HTML 0.75 ms medians (Phase-6 baseline 2.6 / 0.9 / 0.8 ms). Language setting persists under the user profile (`%APPDATA%/FolderAnalyzer`) and is applied on next launch. **ACCEPTED AND CLOSED (2026-09-16) — the 11-item raw evidence package was reviewed and accepted in full.** Remaining phases after Phase 9 (all NOT STARTED, requiring explicit written approval): → Phase 11 (Packaging & Installer) → Phase 12 (Final Integration, QA & Portfolio Cleanup).
+**Phase 10 (Desktop Application Complete - drill-down, read-only reasons panel, export via core exporter v2, settings with language-only persistence, i18n live re-localization, cancellation) DELIVERED and submitted for acceptance (2026-09-15). Suite 397 passed / 2 skipped (384 Phase-9 close + 13 Phase-10 tests). Commits `232f704` -> `bb75b7a`. Engine frozen across Phase 10 (empty `git diff --stat` over `folder_analyzer/engine`, scanner.py, safety.py, security_guard.py, deleter.py). Export re-measured on the same 50k fixture through the desktop path: JSON 2.16 / CSV 0.63 / HTML 0.75 ms medians (Phase-6 baseline 2.6 / 0.9 / 0.8 ms). Language setting persists under the user profile (`%APPDATA%/FolderAnalyzer`) and is applied on next launch. **ACCEPTED AND CLOSED (2026-09-16) — the 11-item raw evidence package was reviewed and accepted in full.** Phase 11 (Packaging & Installer) is **DELIVERED and submitted for acceptance (2026-09-16)**: PyInstaller onedir bundle of the desktop app + Inno Setup installer, locales bundled and loadable from the frozen exe, dedicated `--selftest` proving the I10 gates and the six-condition delete boundary FROM the built artifact (also from the installer output, Python off the `PATH`), version `3.0.0` (string ahead of tag, per §18), full suite from the wheel (398 passed / 2 skipped, same as source). See the Phase 11 block below. Only Phase 12 (Final Integration) remains, NOT STARTED.
 Version of this document: Phase 1 baseline commit.
 
 This is the implementation contract for the project. It is the single, internally
@@ -464,10 +464,10 @@ Fixed process (re-affirmed):
 | 8 — Performance & Scale (hot-path optimization, cancellation end-to-end) | COMPLETE (re-close accepted in substance 2026-09-15) |
 | 9 — Desktop Architecture & Prototype (PySide6, ADR-001, in-process core) | **DELIVERED (2026-09-15); superseded by the accepted Phase 10** |
 | 10 — Desktop Application Complete (drill-down, settings, full parity) | **COMPLETE / APPROVED (2026-09-16)** |
-| 11 — Packaging & Installer (PyInstaller bundle, wheel) | NOT STARTED |
+| 11 — Packaging & Installer (PyInstaller bundle, wheel) | **DELIVERED — submitted for acceptance (2026-09-16)** |
 | 12 — Final Integration, QA & Portfolio Cleanup | NOT STARTED |
 
-Phases 1–8 are complete and approved. Phase 9 is delivered (2026-09-15), superseded by the approved Phase 10. Phase 10 is **COMPLETE / APPROVED (2026-09-16)** — its 11-item raw evidence package was reviewed and accepted in full by the user. Only Phases 11 and 12 remain, both NOT STARTED — none may be started until the user gives an explicit written go-ahead.
+Phases 1–8 are complete and approved. Phase 9 is delivered (2026-09-15), superseded by the approved Phase 10. Phase 10 is **COMPLETE / APPROVED (2026-09-16)** — its 11-item raw evidence package was reviewed and accepted in full by the user. Phase 11 (Packaging & Installer) is **DELIVERED — submitted for acceptance (2026-09-16)** (desktop PyInstaller onedir bundle + Inno Setup installer, version 3.0.0, locales/I10/delete verified from the built and installed artifacts, suite 398 passed / 2 skipped from both source and wheel). Only Phase 12 remains, NOT STARTED — it requires an explicit written go-ahead.
 
 ### Phase 1 — Deletion Security Hardening + Safety Boundary
 - **Objective:** six-condition canonical containment guard in core, API, CLI; protected-path policy; reparse safety; final revalidation.
@@ -725,7 +725,31 @@ Phases 1–8 are complete and approved. Phase 9 is delivered (2026-09-15), super
 - **Estimated effort:** 8–14 h. **Uncertainty:** High.
 
 ### Phase 11 — Packaging & Installer
-- **Status: NOT STARTED — requires explicit written approval before any planning or implementation (mandatory process rule).** Dependencies: Phase 10.
+- **Status: DELIVERED — submitted for acceptance (2026-09-16).** PyInstaller
+  **onedir** (chosen over onefile: reliable Qt plugin resolution + faster cold
+  start; bundle size is informational per R7) bundle of `desktop_app/` only —
+  CLI packaging and the wheel/entry-point mechanism are untouched (R1). CLI end
+  product remains the existing `folder-analyzer.exe` console-script entry point.
+  Scope resolutions applied: installer MANDATORY (R2), Inno Setup 6 chosen
+  (R3), 22-item checklist approved in writing (R4), clean-environment evidence
+  both wheel-in-fresh-venv AND frozen-artifact-standalone (R5a/R5b), version
+  bumped to 3.0.0 with DELIBERATE ahead-of-tag sequencing — string 3.0.0, no
+  `v3.0.0` tag until Phase 12 per §18 (R6), sizes measured raw (R7):
+  exe 2,442,001 B, onedir 116,718,796 B / 172 files, installer 121,218,225 B
+  installed tree. `packaging/FolderAnalyzer.spec` + `folder-analyzer.iss` +
+  `build_desktop.ps1` in version control. Bundled locales verified loading from
+  the frozen exe (127 keys/locale, parity, resolve). New `--selftest <report>`
+  (`desktop_app/selftest.py`) runs the I10 folder/file gates and the
+  six-condition guarded delete against the built artifact and the installed
+  output (real `send2trash`), mirrored in-repo by
+  `tests/test_desktop_selftest.py` (fake-trash). Suite **398 passed / 2
+  skipped** from source AND from the installed wheel in a fresh venv. Engine
+  frozen across the phase (empty diff over
+  `folder_analyzer/engine`, scanner.py, safety.py, security_guard.py,
+  deleter.py). Commits: `c54efb3` (version 3.0.0 + locale package-data) →
+  `c37fa63` (selftest) → `e641116` (packaging scripts) → `docs(pkg)` close.
+  Awaits the user's explicit written acceptance; Phase 11 acceptance criterion
+  "delete boundary intact in bundle" is proven from the built artifact.
 - **Objective:** PyInstaller bundle + optional installer; wheel remains; finalize v3.0.0.
 - **Why:** desktop requires end-user distribution.
 - **Dependencies:** Phase 10; decision D1 (versioning).
