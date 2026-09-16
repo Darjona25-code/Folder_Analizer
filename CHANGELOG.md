@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   EN/ES parity, strings resolve — `en col_name='Name'`, `es 'Nombre'`).
 - **Installer (R2/R3):** Inno Setup 6 script `packaging/folder-analyzer.iss`
   → `dist/FolderAnalyzer-Setup-3.0.0.exe`; silent install/uninstall verified
-  (install exit 0, installed tree 121,218,225 B, uninstall exit 0, dir
+  (install exit 0, installed tree 121,216,313 B, uninstall exit 0, dir
   removed); the installed output runs the self-test standalone (exit 0).
 - **Unsigned installer (deliberate decision):** the setup is NOT code-signed,
   per the user's explicit "ship unsigned" decision. SmartScreen will show

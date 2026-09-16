@@ -735,8 +735,8 @@ Phases 1–8 are complete and approved. Phase 9 is delivered (2026-09-15), super
   both wheel-in-fresh-venv AND frozen-artifact-standalone (R5a/R5b), version
   bumped to 3.0.0 with DELIBERATE ahead-of-tag sequencing — string 3.0.0, no
   `v3.0.0` tag until Phase 12 per §18 (R6), sizes measured raw (R7):
-  exe 2,442,001 B, onedir 116,718,796 B / 172 files, installer 121,218,225 B
-  installed tree. `packaging/FolderAnalyzer.spec` + `folder-analyzer.iss` +
+  exe 2,442,001 B, onedir 116,718,796 B / 172 files, installer 33,314,701 B,
+  installed tree 121,216,313 B / 174 files. `packaging/FolderAnalyzer.spec` + `folder-analyzer.iss` +
   `build_desktop.ps1` in version control. Bundled locales verified loading from
   the frozen exe (127 keys/locale, parity, resolve). New `--selftest <report>`
   (`desktop_app/selftest.py`) runs the I10 folder/file gates and the

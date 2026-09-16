@@ -69,7 +69,7 @@ A disk space analyzer with two front-ends:
 - **Installer MANDATORY (R2, R3):** Inno Setup 6.7.3 (per-user at
   `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`) — `packaging/
   folder-analyzer.iss` → `dist/FolderAnalyzer-Setup-3.0.0.exe`. Silent
-  install into a fresh dir (exit 0; installed tree 121,218,225 B; locales
+  install into a fresh dir (exit 0; installed tree 121,216,313 B; locales
   present), installed-output `--selftest` exit 0 passed=true with Python off
   the PATH, silent uninstall exit 0 (dir removed).
 - **Version 3.0.0 (R6):** `pyproject.toml`, `folder_analyzer/__init__.py`,
