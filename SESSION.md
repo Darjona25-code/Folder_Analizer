@@ -12,7 +12,7 @@ If you need to continue this development session on another PC, open opencode an
 ## Session Summary
 
 - **Date:** September 2026
-- **Project:** Folder Analyzer v2.0.0
+- **Project:** Folder Analyzer v3.0.0
 - **Location:** `C:\OPENCODE\Folder_Analyzer`
 - **GitHub:** https://github.com/Darjona25-code/Folder_Analizer
 
