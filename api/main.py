@@ -1,4 +1,4 @@
-"""FastAPI application entry point for Folder Analyzer v2.0."""
+"""FastAPI application entry point for Folder Analyzer v3.0."""
 
 import uvicorn
 from pathlib import Path
@@ -11,7 +11,7 @@ from .routes import router
 app = FastAPI(
     title="Folder Analyzer",
     description="Disk space analyzer by Caza Bytes - scan drives, view sizes, safely free disk space",
-    version="2.0.0",
+    version="3.0.0",
 )
 
 app.include_router(router)

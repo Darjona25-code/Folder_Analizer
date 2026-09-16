@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "folder-analyzer"
-version = "2.0.0"
+version = "3.0.0"
 description = "A disk space analyzer that scans drives, reports folder sizes, and safely frees disk space"
 readme = "README.md"
 license = {text = "MIT"}
@@ -37,3 +37,6 @@ folder-analyzer-desktop = "desktop_app.__main__:main"
 
 [tool.setuptools.packages.find]
 include = ["folder_analyzer*", "desktop_app*"]
+
+[tool.setuptools.package-data]
+folder_analyzer = ["locales/*.json"]
