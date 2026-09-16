@@ -26,9 +26,11 @@
   "ui": {
     "app_title": "Folder Analyzer",
     "block_items": "{count} item(s) blocked by the safety guard.",
+    "btn_browse": "Browse...",
     "btn_cancel": "Cancel",
     "btn_export": "Export",
     "btn_recycle": "Send to Recycle Bin",
+    "btn_save": "Save",
     "btn_scan": "Scan",
     "col_action": "Action",
     "col_analysis_state": "Analysis State",

@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 
 from desktop_app.controller import DesktopController
 from desktop_app.details_dialog import DetailsDialog
+from desktop_app.export_dialog import ExportDialog
 from desktop_app.worker import ScanWorker
 from folder_analyzer.scanner import ScanCancellation
 from folder_analyzer.utils import format_size
@@ -61,6 +62,7 @@ class MainWindow(QMainWindow):
         self._file_rows = []
         self._details_item = None
         self._details_dialog = None
+        self._export_dialog = None
         self._build_ui()
         self._retranslate()
 
@@ -101,6 +103,11 @@ class MainWindow(QMainWindow):
         self._details_button.setEnabled(False)
         self._toolbar.addWidget(self._details_button)
         self._details_button.clicked.connect(self._open_details)
+
+        self._export_button = QPushButton(self)
+        self._export_button.setEnabled(False)
+        self._toolbar.addWidget(self._export_button)
+        self._export_button.clicked.connect(self._open_export)
 
         self._delete_button = QPushButton(self)
         self._delete_button.setEnabled(False)
@@ -180,6 +187,7 @@ class MainWindow(QMainWindow):
         self._cancel_button.setText(t("btn_cancel"))
         self._open_button.setText(t("desktop_open"))
         self._details_button.setText(t("desktop_details"))
+        self._export_button.setText(t("btn_export"))
         self._delete_button.setText(t("btn_recycle"))
         self._back_button.setText(t("desktop_back"))
         self._table.setHorizontalHeaderLabels([t(key) for key in _COL_KEYS])
@@ -214,6 +222,8 @@ class MainWindow(QMainWindow):
             if fresh is not None:
                 self._details_item = fresh
                 self._details_dialog.refresh(fresh)
+        if self._export_dialog is not None and self._export_dialog.isVisible():
+            self._export_dialog.retranslate(self.controller.t)
         self._update_action_state()
 
     def _start_scan(self):
@@ -372,6 +382,43 @@ class MainWindow(QMainWindow):
             )
             self._details_dialog.show()
 
+    # --- Phase 10: export (E1-E4; delegates to exporter.py v2) -------------
+
+    def _open_export(self):
+        if self._result is None:
+            self.statusBar().showMessage(
+                self.controller.t("empty_table_message"), 5000
+            )
+            return
+        if self._export_dialog is not None and self._export_dialog.isVisible():
+            self._export_dialog.raise_()
+            self._export_dialog.activateWindow()
+            return
+        self._export_dialog = ExportDialog(
+            self.controller.t,
+            default_dir=self.controller.last_scan_root or "",
+            parent=self,
+        )
+        self._export_dialog.export_requested.connect(self._run_export)
+        self._export_dialog.show()
+
+    def _run_export(self, report_format: str, output_path: str):
+        outcome = self.controller.export_report(report_format, output_path)
+        if outcome["status"] == "ok":
+            self.statusBar().showMessage(
+                self.controller.t(
+                    "export_success", path=outcome["path"]
+                ),
+                5000,
+            )
+        else:
+            self.statusBar().showMessage(
+                self.controller.t(
+                    "export_failed", error=outcome["reason"]
+                ),
+                5000,
+            )
+
     def _populate_drill(self):
         self._file_rows = self.controller.file_rows(self._drill_folder)
         self._drill_title.setText(
@@ -433,6 +480,7 @@ class MainWindow(QMainWindow):
         self._details_button.setEnabled(
             detailsable and self._result is not None
         )
+        self._export_button.setEnabled(self._result is not None)
 
     def _run_delete(self):
         if self._stack.currentWidget() is self._drill_page:

@@ -26,9 +26,11 @@
   "ui": {
     "app_title": "Analizador de Carpetas",
     "block_items": "{count} elemento(s) bloqueado(s) por la proteccion.",
+    "btn_browse": "Examinar...",
     "btn_cancel": "Cancelar",
     "btn_export": "Exportar",
     "btn_recycle": "Enviar a la Papelera de reciclaje",
+    "btn_save": "Guardar",
     "btn_scan": "Escanear",
     "col_action": "Accion",
     "col_analysis_state": "Estado de analisis",

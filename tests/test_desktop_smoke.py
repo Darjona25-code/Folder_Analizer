@@ -296,3 +296,46 @@ def test_details_panel_relocalizes_on_language_switch(qapp, mixed_sandbox):
     finally:
         window.close()
         window.deleteLater()
+
+
+def test_export_dialog_writes_validated_reports(qapp, mixed_sandbox, tmp_path):
+    root, data, cache = mixed_sandbox
+    window = MainWindow()
+    window.show()
+    qapp.processEvents()
+    try:
+        window._path_input.setText(root)
+        window._start_scan()
+        _wait_for_scan(window, qapp)
+        assert window._result.cancelled is False
+        assert window._export_button.isEnabled() is True
+
+        window._open_export()
+        qapp.processEvents()
+        dlg = window._export_dialog
+        assert dlg is not None and dlg.isVisible()
+        assert dlg._format_combo.count() == 3
+
+        import json
+
+        dlg._format_combo.setCurrentIndex(0)
+        out = str(tmp_path / "desktop_report.json")
+        dlg._path_input.setText(out)
+        qapp.processEvents()
+        assert dlg._save_button.isEnabled() is True
+
+        dlg._emit()
+        qapp.processEvents()
+        assert os.path.exists(out)
+        payload = json.loads(
+            (tmp_path / "desktop_report.json").read_text(encoding="utf-8")
+        )
+        assert payload["schema_version"] == 2
+        assert payload["root_path"] == os.path.normpath(root)
+        assert (
+            window.statusBar().currentMessage()
+            == window.controller.t("export_success", path=os.path.normpath(out))
+        )
+    finally:
+        window.close()
+        window.deleteLater()
