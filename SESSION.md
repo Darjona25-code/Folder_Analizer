@@ -84,6 +84,18 @@ A disk space analyzer with two front-ends:
   Recycle Bin short-circuited (`FA_SELFTEST_FAKE_TRASH=1`). Classification
   harness mirrors `conftest.classification_neutral_env` (real machine env
   reclassifies everything otherwise).
+- **Residual L2 — live EN/ES re-localization closure (2026-09-16).** Previously
+  only "two separate `I18n` instances load from the bundle". NOW verified at
+  ARTIFACT level: ONE running `dist/FolderAnalyzer.exe` process driven by UI
+  Automation from another process (disposable probe `l2_probe_artifact.py`,
+  isolated `APPDATA`, one-off, not committed) switched EN→ES→EN without
+  restart — title `Folder Analyzer`→`Analizador de Carpetas`, headers `Folder,
+  Size, …`→`Carpeta, Tamano, …` (col_name `Name`→`Nombre`), status `Ready`→
+  `Listo`, buttons `Scan`→`Escanear`; the live frozen process persisted
+  `{"language":"es"}`. Committed regression test
+  `tests/test_desktop_live_relocalization.py` locks the same-instance mutation
+  and same-widget re-render at source level (same `I18n` `id()` constant across
+  EN→ES→EN; suite now 399 passed, 2 skipped).
 - **Full suite from the wheel** in a fresh venv: built
   `folder_analyzer-3.0.0-py3-none-any.whl`, installed into a clean venv, CLI
   `folder-analyzer.exe` scan+quit works, `folder_analyzer`/`desktop_app`

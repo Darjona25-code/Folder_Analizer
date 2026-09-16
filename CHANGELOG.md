@@ -22,6 +22,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Locales bundled** inside the artifact (`_internal/folder_analyzer/locales/
   {en,es}.json`): verified loadable from the frozen exe (127 keys per locale,
   EN/ES parity, strings resolve — `en col_name='Name'`, `es 'Nombre'`).
+- **Residual L2 — live re-localization now verified AT ARTIFACT LEVEL
+  (2026-09-16).** An EN→ES→EN language switch was exercised inside ONE
+  continuously running `dist/FolderAnalyzer/FolderAnalyzer.exe` process via
+  UI Automation (disposable probe, isolated `APPDATA`, one-off, not committed):
+  the same running frozen window re-rendered in place without restart — title
+  `Folder Analyzer`→`Analizador de Carpetas`, column headers `Folder, Size,
+  Files, Recommendation, Confidence, Impact, Reason`→`Carpeta, Tamano,
+  Archivos, Recomendacion, Confianza, Impacto, Motivo` (col_name `Name`→
+  `Nombre`), status bar `Ready`→`Listo`, buttons `Scan`→`Escanear` — and
+  wrote `{"language":"es"}` live. Regression coverage added to this suite:
+  `tests/test_desktop_live_relocalization.py` (source-level, same `I18n`
+  instance `id()` mutated in place, same widget objects, one running
+  `QApplication`); suite 398 → 399 passed, 2 skipped.
 - **Installer (R2/R3):** Inno Setup 6 script `packaging/folder-analyzer.iss`
   → `dist/FolderAnalyzer-Setup-3.0.0.exe`; silent install/uninstall verified
   (install exit 0, installed tree 121,216,313 B, uninstall exit 0, dir
