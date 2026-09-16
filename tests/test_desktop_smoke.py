@@ -15,7 +15,7 @@ import pytest
 pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt  # noqa: E402
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtWidgets import QApplication, QPushButton  # noqa: E402
 
 from desktop_app.main_window import MainWindow  # noqa: E402
 from folder_analyzer.scanner import ScanCancellation  # noqa: E402
@@ -228,6 +228,71 @@ def test_drill_down_relocalizes_on_language_switch(qapp, mixed_sandbox):
             window._file_table.horizontalHeaderItem(0).text()
             == window.controller.t("col_name")
         )
+    finally:
+        window.close()
+        window.deleteLater()
+
+
+def test_details_panel_matches_row_values(qapp, mixed_sandbox):
+    root, data, cache = mixed_sandbox
+    window = MainWindow()
+    window.show()
+    qapp.processEvents()
+    try:
+        window._path_input.setText(root)
+        window._start_scan()
+        _wait_for_scan(window, qapp)
+        assert window._result.cancelled is False
+
+        rows = window.controller.rows(window._result)
+        cache_row = next(r for r in rows if r["path"] == os.path.normpath(cache))
+
+        window._show_details(os.path.normpath(cache))
+        qapp.processEvents()
+        dialog = window._details_dialog
+        assert dialog is not None and dialog.isVisible()
+
+        assert dialog._name_value.text() == cache_row["name"]
+        assert dialog._size_value.text() == cache_row["size"]
+        assert dialog._rec_value.text() == cache_row["rec_label"]
+        assert dialog._conf_value.text() == cache_row["conf_label"]
+        assert dialog._imp_value.text() == cache_row["imp_label"]
+        assert dialog._reason_value.text() == cache_row["reason"]
+
+        delete_buttons = [
+            w for w in dialog.findChildren(QPushButton)
+            if w is not dialog._close_button
+        ]
+        assert delete_buttons == []
+    finally:
+        window.close()
+        window.deleteLater()
+
+
+def test_details_panel_relocalizes_on_language_switch(qapp, mixed_sandbox):
+    root, data, cache = mixed_sandbox
+    window = MainWindow()
+    window.show()
+    qapp.processEvents()
+    try:
+        window._path_input.setText(root)
+        window._start_scan()
+        _wait_for_scan(window, qapp)
+
+        window._show_details(os.path.normpath(cache))
+        qapp.processEvents()
+        dialog = window._details_dialog
+        assert dialog._rec_value.text() == window.controller.t("rec_safe_to_delete")
+
+        window._lang_combo.setCurrentIndex(1)
+        qapp.processEvents()
+        assert window.controller.i18n.lang == "es"
+        assert dialog._rec_value.text() == window.controller.t("rec_safe_to_delete")
+        assert dialog._name_heading.text() == window.controller.t("col_name")
+        assert dialog._reason_value.text()
+
+        window._lang_combo.setCurrentIndex(0)
+        qapp.processEvents()
     finally:
         window.close()
         window.deleteLater()

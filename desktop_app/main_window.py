@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from desktop_app.controller import DesktopController
+from desktop_app.details_dialog import DetailsDialog
 from desktop_app.worker import ScanWorker
 from folder_analyzer.scanner import ScanCancellation
 from folder_analyzer.utils import format_size
@@ -58,6 +59,8 @@ class MainWindow(QMainWindow):
         self._drill_folder = None
         self._folder_rows = []
         self._file_rows = []
+        self._details_item = None
+        self._details_dialog = None
         self._build_ui()
         self._retranslate()
 
@@ -93,6 +96,11 @@ class MainWindow(QMainWindow):
         self._open_button.setEnabled(False)
         self._toolbar.addWidget(self._open_button)
         self._open_button.clicked.connect(self._open_drill_down)
+
+        self._details_button = QPushButton(self)
+        self._details_button.setEnabled(False)
+        self._toolbar.addWidget(self._details_button)
+        self._details_button.clicked.connect(self._open_details)
 
         self._delete_button = QPushButton(self)
         self._delete_button.setEnabled(False)
@@ -171,6 +179,7 @@ class MainWindow(QMainWindow):
         self._scan_button.setText(t("btn_scan"))
         self._cancel_button.setText(t("btn_cancel"))
         self._open_button.setText(t("desktop_open"))
+        self._details_button.setText(t("desktop_details"))
         self._delete_button.setText(t("btn_recycle"))
         self._back_button.setText(t("desktop_back"))
         self._table.setHorizontalHeaderLabels([t(key) for key in _COL_KEYS])
@@ -194,6 +203,17 @@ class MainWindow(QMainWindow):
         self._retranslate()
         if self._stack.currentWidget() is self._drill_page:
             self._populate_drill()
+        elif self._result is not None:
+            self._populate()
+        if (
+            self._details_item is not None
+            and self._details_dialog is not None
+            and self._details_dialog.isVisible()
+        ):
+            fresh = self._recompute_details_item(self._details_item["path"])
+            if fresh is not None:
+                self._details_item = fresh
+                self._details_dialog.refresh(fresh)
         self._update_action_state()
 
     def _start_scan(self):
@@ -317,6 +337,41 @@ class MainWindow(QMainWindow):
                 return item.data(Qt.UserRole)
         return None
 
+    def _recompute_details_item(self, path: str) -> dict | None:
+        """Re-derive a row dict for the details panel from the current scan
+        and language (same controller helpers the tables use), so a live
+        language switch re-localizes the open panel content."""
+        if self._result is None:
+            return None
+        for row in self.controller.rows(self._result):
+            if row["path"] == path:
+                return row
+        for row in self.controller.file_rows(os.path.dirname(path)):
+            if row["path"] == path:
+                return row
+        return None
+
+    def _open_details(self):
+        if self._stack.currentWidget() is self._drill_page:
+            path = self._selected_file_path()
+        else:
+            path = self._selected_folder_path()
+        if path:
+            self._show_details(path)
+
+    def _show_details(self, path: str):
+        item = self._recompute_details_item(path)
+        if item is None:
+            return
+        self._details_item = item
+        if self._details_dialog is not None and self._details_dialog.isVisible():
+            self._details_dialog.refresh(item)
+        else:
+            self._details_dialog = DetailsDialog(
+                self.controller.t, item, parent=self
+            )
+            self._details_dialog.show()
+
     def _populate_drill(self):
         self._file_rows = self.controller.file_rows(self._drill_folder)
         self._drill_title.setText(
@@ -354,11 +409,13 @@ class MainWindow(QMainWindow):
     def _update_action_state(self):
         deletable = False
         openable = False
+        detailsable = False
         if self._stack.currentWidget() is self._drill_page:
             for item in self._file_table.selectedItems():
                 if item.column() == 0:
                     if item.data(Qt.UserRole + 1):
                         deletable = True
+                    detailsable = True
                     break
             self._open_button.setEnabled(False)
         else:
@@ -367,11 +424,15 @@ class MainWindow(QMainWindow):
                     if item.data(Qt.UserRole + 1):
                         deletable = True
                     openable = True
+                    detailsable = True
                     break
             self._open_button.setEnabled(
                 openable and self._result is not None
             )
         self._delete_button.setEnabled(deletable)
+        self._details_button.setEnabled(
+            detailsable and self._result is not None
+        )
 
     def _run_delete(self):
         if self._stack.currentWidget() is self._drill_page:

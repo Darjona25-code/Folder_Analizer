@@ -72,6 +72,7 @@
     "deleted_folders": "{count} carpeta(s) enviada(s) a la Papelera de reciclaje.",
     "desktop_back": "Atrás",
     "desktop_delete_skipped": "Omitida (no segura de eliminar): {name}",
+    "desktop_details": "Detalles",
     "desktop_no_files": "No hay archivos conservados para mostrar.",
     "desktop_open": "Abrir",
     "desktop_pick_folder": "Elegir carpeta...",
