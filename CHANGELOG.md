@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (2026-09-15 — Phase 10 Desktop Application Complete)
+
+- **Drill-down file view** (D1–D5): the desktop table now opens any folder row
+  into a per-file view (`QStackedWidget`), sourced EXCLUSIVELY from
+  `Scanner.retained_records_for` (zero re-classification, Phase 7 precedent);
+  evicted folders show the folder-level-only notice (`records_evicted`) instead of
+  fabricated file rows (D3). I10 gate applied per file row: `a.tmp`/`b.tmp` stay
+  individually actionable beneath a REVIEW_FIRST parent, `notes.txt` does not.
+- **Read-only reasons/details panel** (R1–R4): `desktop_app/details_dialog.py`
+  shows name/size/recommendation/confidence/impact/reason from the same localized
+  ScanResult fields; no delete control is present in the panel.
+- **Export dialog** (E1–E4): format combo (JSON/CSV/HTML) + path + Browse + Save;
+  the handler calls the core `export_json_v2`/`export_csv_v2`/`export_html_v2`
+  (schema v2, deterministic), so `desktop_app/` contains zero export logic.
+- **Settings — language only** (S1–S2): `desktop_app/settings.py` persists `lang`
+  to `%APPDATA%/FolderAnalyzer/folder-analyzer-desktop.json` (stdlib json/pathlib;
+  API/CLI/web/export unaffected); changes apply live and on next launch; invalid
+  lang falls back to `en`; the config path is injectable for tests.
+- **i18n** (I1–I3): single-source locale keys `col_name`, `desktop_back`,
+  `desktop_details`, `desktop_no_files`, `desktop_open`, `desktop_settings`,
+  `settings_language`, `btn_save`, `btn_browse` added to `en.json` and `es.json`
+  (9 per language, parity-enforced). Live re-localization retranslates the table,
+  drill-down, and open dialogs instantly.
+- **Tests +13 (suite 384 → 397 passed, 2 skipped):** controller units
+  (`file_rows` uses retained records + per-file I10, evicted folder → `[]` +
+  `is_evicted` under `RetentionConfig(global_budget=1)`, `delete_files` shares the
+  same guard path as `delete_folders`, `export_report` delegates to exporter v2 +
+  determinism, `AppSettings` persistence) + offscreen smoke (drill-down I10 gates,
+  evicted notice, live re-localization, details panel values + blank delete column,
+  export dialog writes schema-v2 JSON, settings dialog applies/persists/relaunch).
+- **Evidence for closure:** screenshots under `docs/screenshots/` (EN table,
+  EN drill-down, ES details, ES settings); desktop-path export timing on the 50k
+  fixture (`benchmarks/results/export_p10_desktop.json`); frozen-engine diff empty
+  (`git diff --stat c2320ad..HEAD` over engine/scanner/safety/guard/deleter).
+
 ### Added (2026-09-15 — Phase 9 Desktop Architecture & Prototype)
 
 - **ADR-001: PySide6 desktop stack** (`docs/ADR-001-desktop-stack.md`) — short

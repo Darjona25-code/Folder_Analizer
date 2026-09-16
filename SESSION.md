@@ -22,6 +22,35 @@ A disk space analyzer with two front-ends:
 
 - **Interactive CLI** with Rich tables/trees/progress bars, ASCII treemap, Rise/risk safety system (CRITICAL/CAUTION/SAFE), Recycle Bin deletion, JSON/CSV/HTML export, bilingual (EN/ES).
 - **Web UI** with a FastAPI backend (`api/`) + static frontend (`web/`): drive stats, sortable folder table, treemap, exports.
+- **Desktop UI** (Phase 9 → Phase 10) — native PySide6 app consuming the core in-process: scan table, drill-down per-folder file view, read-only reasons panel, JSON/CSV/HTML export (core exporter v2), language settings persisted under the user profile, identical safety/delete/I10 gates.
+
+### Phase 10 — Desktop Application Complete (SHIPPED 2026-09-15, awaiting acceptance)
+
+- **Drill-down file view (D1–D5):** `QStackedWidget` top/drill pages; file rows
+  sourced ONLY from `Scanner.retained_records_for` (zero re-classification);
+  evicted folders → empty rows + folder-level-only notice (D3). I10 gate per file
+  row (`a.tmp`/`b.tmp` actionable under a REVIEW_FIRST parent; `notes.txt` not).
+- **Read-only reasons panel (R1–R4):** `details_dialog.py` — name/size/rec/conf/
+  imp/reason from the same localized row fields; no delete control present.
+- **Export (E1–E4):** `export_dialog.py`, delegates to `export_json_v2`/
+  `export_csv_v2`/`export_html_v2`; zero export logic in `desktop_app/`. Desktop
+  path re-measured on the 50k fixture: JSON 2.16 / CSV 0.63 / HTML 0.75 ms medians
+  (Phase-6 baseline 2.6 / 0.9 / 0.8 ms). Cancellation: no new mechanism (per the
+  approved clarification); timing re-measurement is the required evidence.
+- **Settings (S1–S2):** language-only; `AppSettings` persists to
+  `%APPDATA%/FolderAnalyzer/folder-analyzer-desktop.json`; live re-localization;
+  applied on next launch; invalid lang → `en`.
+- **i18n (I1–I3):** 9 new keys per locale (`col_name`, `desktop_back`,
+  `desktop_details`, `desktop_no_files`, `desktop_open`, `desktop_settings`,
+  `settings_language`, `btn_save`, `btn_browse`), EN/ES parity enforced.
+- **Delete matrix (DM1):** folder rows and drill-down file rows share
+  `controller._guarded_delete` (`validate_delete_target` → confirm → `revalidate`
+  → `send2trash`); verified by tests (missing/outside/scan-root blocked).
+- **Engine frozen:** `git diff --stat c2320ad..HEAD` over `folder_analyzer/engine`,
+  scanner.py, safety.py, security_guard.py, deleter.py is EMPTY.
+- **Suite:** 384 → **397 passed / 2 skipped** (+13 desktop tests). Commits
+  `232f704` → `bb75b7a` (5 Conventional Commits). Docs close (this commit):
+  README desktop section + screenshots, CHANGELOG, ARCHITECTURE, ROADMAP.
 
 ### Recent repairs (12 issues)
 
@@ -32,7 +61,7 @@ Root-folder exclusion and scan-root deletion protection (CLI + API), clean EOF h
 - Python 3.10+ (tested on 3.12)
 - Rich (terminal UI), send2trash (Recycle Bin), psutil (disk info)
 - FastAPI + Uvicorn (web), httpx (API testing)
-- pytest — 375 tests passing (2 skipped) at Phase 8 close/corrections
+- pytest — 397 tests passing (2 skipped) at Phase 10 close
 
 ### To continue development
 
@@ -42,6 +71,9 @@ python -m folder_analyzer --lang es --path C:\
 
 # Web UI
 python -m api
+
+# Desktop UI (PySide6; install with: pip install -e ".[desktop]")
+python -m desktop_app
 ```
 
 ### To install the CLI as a command

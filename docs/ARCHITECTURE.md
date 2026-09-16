@@ -1,12 +1,16 @@
 # Folder Analyzer — Architecture
 
-Status: **Phase 9 — Desktop Architecture & Prototype** (PySide6 scaffold,
+Status: **Phase 10 — Desktop Application Complete** (drill-down, read-only
+reasons panel, export via core exporter v2, settings with language-only
+persistence, i18n live re-localization, cancellation) — delivered and submitted
+for acceptance (2026-09-15; suite 397 passed / 2 skipped, engine frozen, export
+re-measured on the 50k fixture). Phase 9 (PySide6 scaffold,
 ADR-001, core in-process, folder picker → scan → assessment table → gated
-delete, cancellation wired) — delivered and submitted for acceptance
+delete, cancellation wired) was delivered and submitted for acceptance
 (2026-09-15). Phases 5 (recommendation engine + folder composition), 6
 (Exports v2), 7 (Web UI + single-source i18n) and 8 (Performance & Scale,
-pre-acceptance blockers closed 2026-09-14) are closed/approved. Phase 9
-awaits the user's formal written acceptance before any next-phase work. This
+pre-acceptance blockers closed 2026-09-14) are closed/approved. Phases 9/10
+await the user's formal written acceptance before any next-phase work. This
 document contains the core/interface boundary, the current module map, the
 CLI/Web/Desktop relationship, the desktop section (§3c), and the benchmark
 table.
@@ -61,7 +65,7 @@ Interfaces:
 | `folder_analyzer/exporter.py` | JSON/CSV/HTML export: v1 schema (backward compat) + **v2 (Phase 6, ScanResult-backed, deterministic, zero-reclassification; composition = full recursive aggregation)** | Core |
 | `api/` | FastAPI app (`main.py`) + routes (`routes.py`) + Pydantic models (`models.py`) — web adapter. Phase 7 surfaces: `/api/scan?lang=` (per-folder localized `AssessmentView` + recursive `composition`/`recursive_total`), `/api/i18n?lang=` (single-source `{ui, reasons}`), `/api/folder/files?path=&lang=` (retained records, `evicted` flag, zero re-classification). Phase 8: `POST /api/scan/cancel` (best-effort, idempotent token on `app.state.last_scan_cancellation`) | Interface |
 | `web/` | Static front-end (`index.html`, `js/app.js`, `css/style.css`): schema-v2 consumption (folder + per-file recommendation/confidence/impact/localized reason; drill-down panel; recursive total), locale-file lookups, I10 item-vs-folder gating (`isActionEnabled`), no raw `reason_key` rendered | Interface |
-| `desktop_app/` | **Phase 9 — PySide6 desktop prototype (Desktop-only dependency, ADR-001).** Consumes the core **in-process only** (no FastAPI server, no webview): `controller.py` (Qt-free — scan/rows/action gate/guarded delete, unit-testable headless), `worker.py` (`ScanWorker` QThread feeds results to the UI), `main_window.py` (picker → scan → assessment table → gated delete, language EN/ES, cancelled/partial notice). Deletion reuses `security_guard.validate_delete_target` + `revalidate` + `send2trash` (six-condition guard on every path); I10 gate = `deletable && recommendation == safe_to_delete` per folder; `ScanCancellation` token surfaced as an explicit PARTIAL notice | Interface |
+| `desktop_app/` | **Phase 9 — PySide6 desktop prototype (Desktop-only dependency, ADR-001).** Consumes the core **in-process only** (no FastAPI server, no webview): `controller.py` (Qt-free — scan/rows/action gate/guarded delete, unit-testable headless), `worker.py` (`ScanWorker` QThread feeds results to the UI), `main_window.py` (picker → scan → assessment table → gated delete, language EN/ES, cancelled/partial notice). **Phase 10 — Desktop Application Complete:** drill-down `show_drill_down` (file rows only from `Scanner.retained_records_for`, evicted folders → empty + folder-level-only notice D3), read-only `details_dialog.py` (R1–R4, no delete control), `export_dialog.py` (E1–E4, thin wrapper over `folder_analyzer/exporter.py` v2 — zero export logic here), `settings.py` + `settings_dialog.py` (S1–S2, language-only config under the user profile, live re-localization, applied on next launch). Deletion reuses `security_guard.validate_delete_target` + `revalidate` + `send2trash` (six-condition guard on every path); I10 gate = `deletable && recommendation == safe_to_delete` per folder and per drill-down file row; `ScanCancellation` token surfaced as an explicit PARTIAL notice | Interface |
 | `benchmarks/` | Fixture generator + smoke/export benchmarks (fixed baseline). Phase 8: `--affinity HEX` fixed-mask pinning (reproducible), KB µs/file measurement, `--cancel` cancellation-responsive probe | Tooling |
 | `tests/` | pytest suites | Tooling |
 
@@ -109,6 +113,36 @@ explicit PARTIAL notice — never as a silent success. i18n loads the same
 languages. Desktop tests run headless under `QT_QPA_PLATFORM=offscreen` plus Qt-free
 controller unit tests (I10 gate, guarded delete, cancellation, i18n).
 
+Phase 10 (interface layer only — **no engine/classifier/KB/scanner/deleter change**,
+engine diff empty at close, verified `git diff --stat c2320ad..HEAD` over
+`folder_analyzer/engine`, scanner.py, safety.py, security_guard.py, deleter.py):
+- **Drill-down** reads ONLY `Scanner.retained_records_for` (Phase 7 UI precedent —
+  zero re-classification): `DesktopController.file_rows` returns `[]` for evicted
+  folders and `is_evicted` mirrors the web `evicted` flag; the UI shows the
+  folder-level-only notice (D3), never fabricated file rows.
+- **Reasons/details panel** (`details_dialog.py`) is read-only (no delete control),
+  sourced from the same localized row fields (R1–R4).
+- **Export** (`export_dialog.py`, E1–E4) calls `export_json_v2` / `export_csv_v2` /
+  `export_html_v2` with the in-memory `ScanResult` and single-source i18n; no export
+  logic in the desktop. Re-measured on the 50k fixture through the desktop path:
+  JSON 2.16 / CSV 0.63 / HTML 0.75 ms medians.
+- **Settings** (S1–S2) is language-only: `AppSettings` persists `lang` to
+  `%APPDATA%/FolderAnalyzer/folder-analyzer-desktop.json` (stdlib, injectable
+  `config_path` for tests); live re-localization on change; applied on next launch.
+- **Delete matrix** (DM1): folder rows and drill-down file rows share the SAME
+  `controller._guarded_delete` path (`validate_delete_target` → confirm →
+  `revalidate` → `send2trash`); I10 gate is applied per item, so a SAFE file inside
+  a REVIEW_FIRST parent stays individually actionable exactly as in the web UI.
+- **i18n** (I1–I3): single-source `locales/{en,es}.json` keys `col_name`,
+  `desktop_back`, `desktop_details`, `desktop_no_files`, `desktop_open`,
+  `desktop_settings`, `settings_language`, `btn_save`, `btn_browse` (9 per language,
+  parity-enforced); no translation string in Python.
+- New desktop modules: `details_dialog.py`, `export_dialog.py`, `settings.py`,
+  `settings_dialog.py`; `controller.py` extended (file_rows, is_evicted,
+  delete_files, export_report, scan retention param, _scanner/_last_result).
+  Tests +13 (suite 384 → 397 passed, 2 skipped) + offscreen screenshots under
+  `docs/screenshots/`.
+
 ## 3. CLI / Web / Desktop relationship
 
 - All three interfaces expose the **same** core features (scan, analyze, export, gated
@@ -116,21 +150,33 @@ controller unit tests (I10 gate, guarded delete, cancellation, i18n).
 - Deletion is gated by the **same** `security_guard` in CLI and API (and Desktop),
   so no interface can bypass the deletion boundary.
 
-### 3c. Desktop app (Phase 9)
+### 3c. Desktop app (Phase 9 → Phase 10)
 
 - **Stack:** PySide6 (Qt6), Desktop-only optional dependency (`pyproject` extra
   `desktop`), entry point `folder-analyzer-desktop` / `python -m desktop_app`.
 - **Process model:** in-process core only. `controller.py` never imports Qt (pure
   unit tests); `worker.py` runs the core `Scanner` on a `QThread`; `main_window.py`
   is a thin view (picker, path input, EN/ES language selector, Scan/Cancel/Recycle
-  Bin actions, assessment table, PARTIAL notice label).
-- **Delete path (every delete):** UI gate `row.action` → `QMessageBox` confirm →
-  `controller.delete_folders` → `validate_delete_target(scan_root)` → `revalidate`
+  Bin actions, assessment table, PARTIAL notice label, drill-down stacked view,
+  Details/Export/Settings dialogs).
+- **Delete path (every delete, folder AND file):** UI gate `row.action` →
+  `QMessageBox` confirm → `controller.delete_folders`/`delete_files` → shared
+  `controller._guarded_delete` → `validate_delete_target(scan_root)` → `revalidate`
   → `send2trash`. Non-OK guard verdicts are never deleted.
 - **Row source:** descendants of the scan root only (the scanned root is never a
   normal deletable row), sorted by size, with localized
   recommendation/confidence/impact/reason from the scan-time `ScanResult`
   (zero re-classification).
+- **Drill-down (Phase 10):** per-folder retained file rows via
+  `Scanner.retained_records_for` only; `DesktopController.file_rows` returns `[]`
+  for evicted folders and exposes `is_evicted`, so the drill view shows the
+  folder-level-only notice exactly like the web surface (D3). I10 gate applied per
+  file row.
+- **Details/Export/Settings (Phase 10):** details dialog is read-only
+  (R1–R4); export dialog collects format + path and delegates to the core v2
+  exporters (E1–E4); settings dialog changes and persists language to the user
+  profile, applied on next launch (S1–S2); live re-localization retranslates every
+  open surface instantly.
 
 ## 4. Scanner flow (current)
 

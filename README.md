@@ -4,6 +4,7 @@ A disk space analyzer that scans any drive or folder, reports folder sizes, and 
 
 - **Interactive CLI** — Rich terminal UI with tables, ASCII treemap, and progress bars.
 - **Web UI** — FastAPI backend + static frontend (Caza Bytes branding) with drive stats, sortable table, treemap, and export.
+- **Desktop UI** — native PySide6 app (optional extra) with scan, drill-down file view, read-only reasons panel, export, language settings, and the same safety gates as the other surfaces.
 
 ## Features
 
@@ -14,7 +15,8 @@ A disk space analyzer that scans any drive or folder, reports folder sizes, and 
 - **Scan-root protection** — The scanned folder (and any ancestor) can never be deleted, in CLI and API
 - **Safe deletion** — Sends files to the Recycle Bin (recoverable) instead of permanent delete
 - **Export reports** — JSON, CSV, or a self-contained HTML report
-- **Bilingual** — Full English and Spanish support (CLI `--lang en`/`es`, API `lang` parameter, localized exports)
+- **Bilingual** — Full English and Spanish support (CLI `--lang en`/`es`, API `lang` parameter, localized exports, desktop settings)
+- **Drill-down + reasons** — Desktop opens per-folder retained files with per-file gates and a read-only details panel
 - **Scan cancellation** — CLI/API scans stop on request and are explicitly marked PARTIAL, never presented as silently complete
 
 ## Installation
@@ -111,6 +113,33 @@ Then open <http://127.0.0.1:8000>. The interface shows drive stats plus the scan
 
 Endpoints that read scan state return `400` until a scan has been performed in the current process.
 
+## Desktop UI
+
+Run from the source tree (PySide6 must be installed — `pip install -e ".[desktop]"`):
+
+```bash
+python -m desktop_app
+```
+
+or via the `folder-analyzer-desktop` script. Pick a folder, scan, then use the
+table the same way as the web UI: rows are sorted by size with a localized
+recommendation / confidence / impact / reason; **Open** drills into a folder's
+retained files, **Details** opens a read-only reasons panel, **Export** writes a
+JSON/CSV/HTML v2 report, and **Settings** changes the language (persisted under
+your user profile and applied next launch). Delete is gated identically on every
+surface: `validatable → confirm → revalidated → Recycle Bin`, and the I10 rule
+(`deletable && recommendation == safe_to_delete`) is applied per folder row AND
+per drill-down file row, so a `SAFE_TO_DELETE` file inside a `REVIEW_FIRST`
+parent stays individually actionable.
+
+| Main table (EN) | Drill-down (EN) |
+|---|---|
+| ![Main table](docs/screenshots/01-main-table-en.png) | ![Drill-down](docs/screenshots/02-drill-down-en.png) |
+
+| Details panel (ES) | Settings (ES) |
+|---|---|
+| ![Details](docs/screenshots/03-details-es.png) | ![Settings](docs/screenshots/04-settings-es.png) |
+
 ## Project Structure
 
 ```
@@ -126,6 +155,15 @@ Folder_Analizer/
 │   ├── exporter.py            # JSON/CSV/HTML export (localized)
 │   ├── i18n.py                # English/Spanish translations
 │   └── utils.py               # Helper functions
+├── desktop_app/               # PySide6 desktop UI (Phase 9 → Phase 10)
+│   ├── __main__.py            # `python -m desktop_app`
+│   ├── controller.py          # Qt-free logic: scan/rows/drill-down/gated delete/export
+│   ├── main_window.py         # Qt view: table, drill-down, toolbar, dialogs
+│   ├── worker.py              # QThread scan worker (core Scanner)
+│   ├── details_dialog.py      # Read-only reasons panel
+│   ├── export_dialog.py       # JSON/CSV/HTML export (core exporter v2)
+│   ├── settings.py            # Language-only persistence (user profile)
+│   └── settings_dialog.py     # Language settings dialog
 ├── api/                       # FastAPI backend (Web UI)
 │   ├── main.py                # App + static file mounting + entry point
 │   ├── routes.py              # REST endpoints
@@ -136,7 +174,8 @@ Folder_Analizer/
 │   ├── css/style.css
 │   ├── js/app.js
 │   └── assets/                # Branding (Caza Bytes)
-├── tests/                     # 375 unit + integration tests (2 skipped)
+├── tests/                     # 397 unit + integration tests (2 skipped)
+├── docs/                      # Roadmap, architecture, safety, ADR, screenshots
 ├── requirements.txt
 ├── pyproject.toml
 ├── LICENSE                    # MIT
@@ -150,7 +189,7 @@ pip install pytest
 pytest tests/
 ```
 
-375 tests (2 skipped) cover the scanner, safety rules, deletion (protected paths, iterative traversal), the CLI (EOF handling, drill-down, cancellation announcement), exports (localization + v2 determinism and cancelled-markers), the API (state, root protection, cancellation), recommendation/composition, locale parity, knowledge-base cache parity, and web-asset audits. Run individual files with `pytest tests/test_<area>.py`.
+397 tests (2 skipped) cover the scanner, safety rules, deletion (protected paths, iterative traversal), the CLI (EOF handling, drill-down, cancellation announcement), exports (localization + v2 determinism and cancelled-markers), the API (state, root protection, cancellation), recommendation/composition, locale parity, knowledge-base cache parity, web-asset audits, and the desktop UI (headless via `QT_QPA_PLATFORM=offscreen`: drill-down I10 gates, evicted notice, reasons panel, export dialog, settings persistence). Run individual files with `pytest tests/test_<area>.py`.
 
 ## Dependencies
 
@@ -161,6 +200,7 @@ pytest tests/
 - [FastAPI](https://fastapi.tiangolo.com/) + [Uvicorn](https://www.uvicorn.org/) — Web backend
 - [aiofiles](https://github.com/Tinche/aiofiles) — Async file support (FastAPI static)
 - [httpx](https://www.python-httpx.org/) — API test client
+- [PySide6](https://doc.qt.io/qtforpython-6/) — Desktop UI (optional `desktop` extra)
 
 ## License
 
