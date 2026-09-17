@@ -46,6 +46,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   close reads **400 passed / 2 skipped** wherever stated as current state;
   historical point-in-time counts are preserved as recorded facts (baseline 399
   at `d283730`, post-E2E 399 at `bfeb177`, Phase 11 close 399, wheel close 398).
+- **README running-test count reconciled (`7309289`, 2026-09-17).** The TASK 8
+  reconciliation is now extended to README.md: the tests-section count reads
+  "400 tests (2 skipped)" (was 399 at the earlier README reconcile). Suite
+  re-verified green at that commit (400 passed / 2 skipped).
+- **TASK 9/10 final evidence delivered (2026-09-17).** Full raw
+  `pytest tests/ -v` runs at the current final HEAD (400 passed / 2 skipped),
+  the TASK 10 STOP statement and evidence package, and the `git show` hunks
+  (`8553999`, `7309289`) were packaged as verbatim evidence (TASK 9/10 final
+  evidence plus the TASK 8/9/10 evidence PDFs) in the user's Documents folder.
 - **No git tag yet.** The single `v3.0.0` tag is applied ONLY when the user
   gives written acceptance of Phase 12 (§18 sequencing stays intact).
 

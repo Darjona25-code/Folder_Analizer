@@ -204,6 +204,12 @@ A disk space analyzer with two front-ends:
 - **TASK 9 - final full suite at the true final HEAD (after the TASK 8 doc
   commit lands):** full raw output recorded in the phase record —
   **400 passed / 2 skipped**; HEAD hash confirmed; working tree clean.
+- **README reconciliation + TASK 9/10 evidence (2026-09-17).** README.md
+  tests-count reconciled 399 → **400 tests (2 skipped)** (`7309289`, pushed);
+  the final full suite re-verified green at the current HEAD (400 passed /
+  2 skipped) and the TASK 8/9/10 evidence PDFs (raw, verbatim, no summary)
+  delivered to `C:\Users\Flaptop2\Documents`. Phase 12 remains **IN PROGRESS —
+  awaiting the user's written acceptance after TASK 10**; no `v3.0.0` tag.
 - **Status:** IN PROGRESS — TASKS 1–9 executed with raw evidence. NOT
   delivered/approved; awaiting the user's written acceptance after TASK 10;
   **no `v3.0.0` tag created.**
