@@ -29,3 +29,4 @@ reports/
 deletion_audit.jsonl
 benchmarks/generated/
 benchmarks/results/
+e2e/out/
