@@ -3,6 +3,7 @@
 import os
 import tempfile
 import pytest
+from folder_analyzer.engine.enums import DeletionRecommendation
 from folder_analyzer.scanner import Scanner, FolderInfo, sort_folders_by_size
 
 
@@ -103,3 +104,38 @@ def test_scanner_progress_callback(tmp_dir):
 
     scanner.scan(tmp_dir, on_progress=on_progress)
     assert len(progress_calls) > 0
+
+
+def test_scanner_nested_only_folder_stays_review_first(tmp_dir):
+    """TASK 5B regression lock: a real scanner pass on a nested-only folder.
+
+    The parent holds 0 DIRECT bytes (all content lives in its subfolder), so
+    the scanner builds an EMPTY direct composition and the derived folder
+    recommendation must be REVIEW_FIRST (reason_key=``r6_review_first``), even
+    though the parent's recursive content is 100% disposable. The disposable
+    child folder (with positive direct disposable evidence) stays
+    SAFE_TO_DELETE (reason_key=``r5_safe_to_delete``).
+    """
+    nested = os.path.join(tmp_dir, "nested_only")
+    cache = os.path.join(nested, "cache")
+    os.makedirs(cache, exist_ok=True)
+    for name in ["a.tmp", "b.tmp", "c.tmp"]:
+        with open(os.path.join(cache, name), "w") as f:
+            f.write("x" * 10)
+
+    scanner = Scanner(max_workers=2)
+    scanner.scan(nested)
+    result = scanner.scan_result()
+
+    parent = result.per_folder[os.path.normpath(nested)]
+    child = result.per_folder[os.path.normpath(cache)]
+
+    assert parent.files_analyzed == 0
+    assert parent.composition.total_bytes == 0
+    assert parent.assessment.recommendation is DeletionRecommendation.REVIEW_FIRST
+    assert parent.assessment.reason_key == "r6_review_first"
+
+    assert child.files_analyzed == 3
+    assert child.composition.total_bytes == 30
+    assert child.assessment.recommendation is DeletionRecommendation.SAFE_TO_DELETE
+    assert child.assessment.reason_key == "r5_safe_to_delete"
