@@ -114,6 +114,69 @@ A disk space analyzer with two front-ends:
   written acceptance (2026-09-16)** — all residual items 1–4 and L2 closed
   with raw evidence; suite 399 passed / 2 skipped at close; engine frozen.
 
+### Phase 12 - Final Integration, QA & Portfolio Cleanup (IN PROGRESS 2026-09-16; NOT yet delivered/approved)
+
+- **Go-ahead:** the user issued the 10-task evidence brief (2026-09-16); strict sequential execution, raw evidence per task, no tag, STOP at TASK 10.
+- **TASK 1 - baseline.** Full suite at HEAD `d283730`: **399 passed / 2 skipped / 2 warnings in 10.40 s** (matches the Phase 11 close).
+- **TASK 2 - committed E2E harness (`bfeb177`, pushed).** `e2e/e2e_common.py`,
+  `e2e/run_e2e.py`, `e2e/frozen_ui_e2e.py`; `.gitignore` += `e2e/out/`.
+  Throwaway tree `C:\fa_e2e_phase12` rebuilt per surface; expected verdicts
+  reproduced (Data\cache → safe_to_delete/high/r5, Data+Downloads →
+  review_first/r2, wiki_x → review_first/low/r3_unknown). **34/34 checks PASS**:
+  CLI EN+ES subprocess (scan/exports/gated delete: SAFE cache deletable,
+  REVIEW row deletable, scan root blocked), Web TestClient parity (root
+  blocked, drill-down gating), Desktop offscreen Qt (rows, i18n, drill, gated
+  delete), **JSON export byte-identical across CLI/Web/Desktop**, live
+  EN/ES/EN on source + frozen exe, frozen artifact UIA (ValuePattern path set,
+  Scan clicked, grid cell text readable → rows matched source), artifact
+  `--selftest` all-pass (3.0.0, locales 127/127, I10 gates, guard blocks
+  invalid, guard send2trash deletes real). COM teardown crash avoided by
+  printing verdict + `os._exit(0)` + `taskkill /F`.
+- **TASK 3 - stability + i18n completeness.** Full suite after TASK 2 STILL
+  **399 passed / 2 skipped** (6.36 s); locale-focused run 48 passed;
+  `UI_KEYS en=127 es=127 symmetric=True`; `REASON_KEYS en=22 es=22
+  symmetric=True`.
+- **TASK 4 - export round-trip.** schema=2; root `C:\fa_e2e_phase12`; 9
+  files/6 folders; 7 scan paths present; CSV 13 cols/6 rows with cache row
+  `safe_to_delete/high` correct; HTML 6991 B contains paths+reasons;
+  csv⊆json set parity True; **JSON determinism sha1 `3f8bc7fd…`** with fixed
+  `scan_date`. Disposable probe (temp) removed in TASK 6.
+- **TASK 5 - threshold revalidation on REAL folders (engine frozen).**
+  9 real folders scanned on this machine (Downloads, Documents, Local\Temp,
+  pip cache, INetCache, WER, user .cache, Edge cache, Programs):
+  **9/9 reproduced the exact expected R1-R6 verdict** with frozen thresholds
+  (0.85/0.10/0.15/0.0/HIGH); invariants held (unknown>0 ⇒ never SAFE; SAFE ⇒
+  confidence HIGH; user_value>0 ⇒ ≤ REVIEW_FIRST). Sanity: Local Temp →
+  SAFE/HIGH (real cache), Downloads → downloads_policy, Documents →
+  `r2_user_value`. Byte-fidelity probe: engine totals EXACT vs an independent
+  `os.stat` walk on Downloads/Documents/pip cache (10,263,103,080 B /
+  4,275,953 B / 275,859,170 B; file counts 19/9/349). The only mismatch was
+  Edge's live `journal.baj` (os.stat=4 vs DirEntry.stat=0 while Edge wrote it)
+  — concurrent browser mutation, not an engine defect. Design note confirmed:
+  per-folder `FolderAggregation.composition` = DIRECT bytes (scanner.py:418/452);
+  exports/UI display the full recursive fold; nested-only folders (pip, Edge,
+  Programs) resolve via the zero-byte-tree branch → REVIEW_FIRST because R5
+  requires positive DIRECT disposable evidence (ROADMAP §11; by design, not a
+  defect). **Verdict: no deviation — thresholds and engine unchanged.**
+- **TASK 6 - scratch cleanup.** 20 disposable probe/log files removed from
+  the temp sandbox (kept `make_roadmap_pdf.py` + `roadmap_updated.html` for
+  TASK 8); repo working tree verified clean before and after (`git
+  status --porcelain` empty, `git diff --stat` empty, HEAD `bfeb177`).
+- **TASK 7 - perf smoke vs Phase 8 baseline (§15 +20% gate).** 50k
+  deterministic fixture, fixed mask `0xc00` (P-cores 10,11), uninstrumented:
+  t_scan warm n=3 = **0.331/0.333/0.339 s (mean 0.334, +7.8% vs 0.309–0.311)**;
+  KB dispatch 2.73–2.83 µs/file (≤ +16.4%), classifier 2.25–2.33 (≤ +9%);
+  export t_scan 0.3865 s warm (+8.9%) / 0.4088 s cold (+15.2%); **gate alloc
+  0.26 MiB and retained 7,400 @ 0.00% (exact)**; RSS envelope 16.2–17.8 MiB
+  (informational). First run 0.609 s was a cold page-cache artifact after
+  fixture regeneration (warm runs within gate). Export bytes: json 59,862 /
+  csv 7,509 byte-identical to P8; html 30,281 B (P8 recorded 30,081 B;
+  exporter.py untouched since `552625b` — HTML embeds i18n strings; noted as
+  non-gate observation). **Verdict: PASS within gate.**
+- **Status:** IN PROGRESS — TASKS 1–8 executed with raw evidence. NOT
+  delivered/approved; awaiting the user's written acceptance after TASK 10;
+  **no `v3.0.0` tag created.**
+
 ### Recent repairs (12 issues)
 
 Root-folder exclusion and scan-root deletion protection (CLI + API), clean EOF handling in the CLI, correct drill-down indexing, API scan state moved to `app.state` (opt-in reload via `FOLDER_ANALYZER_RELOAD=1`), `Field(default_factory=list)` for models, iterative `get_folder_size` (no recursion crash), `AppData\Roaming` flagged CAUTION, frontend uses detected drive labels and separates scanned vs drive stats, localized exports (CSV/HTML + API `lang`), valid setuptools `build-backend`, version consistency, expanded i18n.
@@ -123,7 +186,7 @@ Root-folder exclusion and scan-root deletion protection (CLI + API), clean EOF h
 - Python 3.10+ (tested on 3.12)
 - Rich (terminal UI), send2trash (Recycle Bin), psutil (disk info)
 - FastAPI + Uvicorn (web), httpx (API testing)
-- pytest — 398 tests passing (2 skipped) at Phase 11 close (397 at Phase 10 close)
+- pytest — 399 tests passing (2 skipped) at Phase 11/12 close (398 in the wheel close, 397 at Phase 10 close)
 
 ### To continue development
 

@@ -9,15 +9,21 @@ ADR-001, core in-process, folder picker → scan → assessment table → gated
 delete, cancellation wired) was delivered (2026-09-15) and is superseded by
 the approved Phase 10. **Phase 11 — Packaging & Installer** (PyInstaller
 onedir bundle of the desktop app + Inno Setup installer, locales bundled,
-`--selftest` artifact verification, version 3.0.0) is **DELIVERED — submitted
-for acceptance (2026-09-16)**: packaging scripts live under `packaging/`;
-the wheel remains the CLI's only distribution path; the engine is untouched
-(empty diff over the protected paths); suite 398 passed / 2 skipped from
-source and from the installed wheel. Phases 5 (recommendation engine +
+`--selftest` artifact verification, version 3.0.0) is **COMPLETE / APPROVED
+(2026-09-16)** — user written acceptance given; packaging scripts live under
+`packaging/`; the wheel remains the CLI's only distribution path; the engine
+is untouched (empty diff over the protected paths); suite 399 passed / 2
+skipped at close, matching the source. Phases 5 (recommendation engine +
 folder composition), 6
 (Exports v2), 7 (Web UI + single-source i18n) and 8 (Performance & Scale,
-pre-acceptance blockers closed 2026-09-14) are closed/approved. Phase 12 is
-NOT STARTED and requires the user's explicit written go-ahead. This
+pre-acceptance blockers closed 2026-09-14) are closed/approved. **Phase 12
+(Final Integration, QA & Portfolio Cleanup) is IN PROGRESS (2026-09-16)** —
+written go-ahead received; committed scripted E2E harness (`bfeb177`, 34/34
+CLI/Web/Desktop parity + frozen-artifact UIA + `--selftest`), post-E2E suite
+399 passed / 2 skipped, locale completeness 127/127 UI + 22/22 reasons,
+export round-trip + determinism, threshold revalidation on 9 real folders
+(no deviation — engine frozen), scratch cleaned, perf smoke within the Phase 8
++20% gate. This
 document contains the core/interface boundary, the current module map, the
 CLI/Web/Desktop relationship, the desktop section (§3c), and the benchmark
 table.

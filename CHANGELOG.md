@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (2026-09-16 — Phase 12 Final Integration, IN PROGRESS; not yet delivered)
+
+- **Committed scripted E2E harness (`bfeb177`).** `e2e/e2e_common.py`,
+  `e2e/run_e2e.py` and `e2e/frozen_ui_e2e.py` run against a throwaway tree
+  (`C:\fa_e2e_phase12`, rebuilt before each surface) and the frozen artifact:
+  **34/34 checks PASS** — CLI EN/ES subprocess scans/exports/gated deletes,
+  Web `TestClient` parity, Desktop offscreen Qt parity, **byte-identical JSON
+  export across the three surfaces**, live EN/ES/EN re-localization on source
+  and frozen exe, frozen-artifact UIA session (scan initiated by value-type
+  pattern, grid cell text read back, verdicts matching source), and artifact
+  `--selftest` (version 3.0.0, locales 127/127, I10 gates, guarded delete).
+  Raw logs under `e2e/out/` (gitignored).
+- **Phase 12 QA evidence (TASKS 1–7):** baseline suite 399 passed / 2
+  skipped; post-E2E suite STILL 399 passed / 2 skipped; locale completeness
+  UI 127/127 EN=ES symmetric and reasons 22/22 symmetric; export round-trip
+  schema v2 (9 files/6 folders, 7 scan paths, CSV 13 cols/6 rows with the
+  safe-del row correct, HTML 6991 B, csv⊆json set parity, JSON determinism
+  sha1-equal under fixed `scan_date`); threshold revalidation on 9 real
+  folders reproducing expected R1–R6 verdicts with frozen thresholds (no
+  deviation — engine remains frozen); perf smoke vs Phase 8 baseline within
+  the +20% gate (alloc 0.26 MiB / 7,400 retained @ 0.00%; warm t_scan mean
+  +7.8%, KB dispatch ≤ +16.4%, export ≤ +8.9%).
+- **No git tag yet.** The single `v3.0.0` tag is applied ONLY when the user
+  gives written acceptance of Phase 12 (§18 sequencing stays intact).
+
 ### Added (2026-09-16 — Phase 11 Packaging & Installer)
 
 - **Phase 11 ACCEPTED AND CLOSED (2026-09-16)** — user's written acceptance.
