@@ -1,6 +1,6 @@
 # Folder Analyzer
 
-A disk space analyzer that scans any drive or folder, reports folder sizes, and safely frees disk space by sending files to the Recycle Bin (recoverable). Ships with two front-ends:
+A disk space analyzer that scans any drive or folder, reports folder sizes, and safely frees disk space by sending files to the Recycle Bin (recoverable). Ships with three front-ends:
 
 - **Interactive CLI** — Rich terminal UI with tables, ASCII treemap, and progress bars.
 - **Web UI** — FastAPI backend + static frontend (Caza Bytes branding) with drive stats, sortable table, treemap, and export.
@@ -18,6 +18,7 @@ A disk space analyzer that scans any drive or folder, reports folder sizes, and 
 - **Bilingual** — Full English and Spanish support (CLI `--lang en`/`es`, API `lang` parameter, localized exports, desktop settings)
 - **Drill-down + reasons** — Desktop opens per-folder retained files with per-file gates and a read-only details panel
 - **Scan cancellation** — CLI/API scans stop on request and are explicitly marked PARTIAL, never presented as silently complete
+- **Cross-surface E2E parity** — committed `e2e/` harness verifies CLI/Web/Desktop equivalence (byte-identical JSON exports) plus the frozen desktop artifact via UI Automation and `--selftest` (Phase 12)
 
 ## Installation
 
@@ -187,15 +188,18 @@ Folder_Analizer/
 │   └── utils.py               # Helper functions
 ├── desktop_app/               # PySide6 desktop UI (Phase 9 → Phase 10)
 │   ├── __main__.py            # `python -m desktop_app`
+│   ├── app.py                 # Qt application bootstrap
 │   ├── controller.py          # Qt-free logic: scan/rows/drill-down/gated delete/export
 │   ├── main_window.py         # Qt view: table, drill-down, toolbar, dialogs
 │   ├── worker.py              # QThread scan worker (core Scanner)
 │   ├── details_dialog.py      # Read-only reasons panel
 │   ├── export_dialog.py       # JSON/CSV/HTML export (core exporter v2)
 │   ├── settings.py            # Language-only persistence (user profile)
-│   └── settings_dialog.py     # Language settings dialog
+│   ├── settings_dialog.py     # Language settings dialog
+│   └── selftest.py            # `--selftest` artifact verification (Phase 11)
 ├── packaging/                 # Phase 11: PyInstaller spec + Inno Setup script
-├── tests/                     # 398 unit + integration tests (2 skipped)
+├── e2e/                       # Phase 12: scripted E2E harness (CLI/Web/Desktop + frozen artifact)
+├── tests/                     # 399 unit + integration tests (2 skipped)
 ├── api/                       # FastAPI backend (Web UI)
 │   ├── main.py                # App + static file mounting + entry point
 │   ├── routes.py              # REST endpoints
@@ -206,7 +210,6 @@ Folder_Analizer/
 │   ├── css/style.css
 │   ├── js/app.js
 │   └── assets/                # Branding (Caza Bytes)
-├── tests/                     # 398 unit + integration tests (2 skipped)
 ├── docs/                      # Roadmap, architecture, safety, ADR, screenshots
 ├── requirements.txt
 ├── pyproject.toml
@@ -221,7 +224,7 @@ pip install pytest
 pytest tests/
 ```
 
-397 tests (2 skipped) cover the scanner, safety rules, deletion (protected paths, iterative traversal), the CLI (EOF handling, drill-down, cancellation announcement), exports (localization + v2 determinism and cancelled-markers), the API (state, root protection, cancellation), recommendation/composition, locale parity, knowledge-base cache parity, web-asset audits, and the desktop UI (headless via `QT_QPA_PLATFORM=offscreen`: drill-down I10 gates, evicted notice, reasons panel, export dialog, settings persistence). Run individual files with `pytest tests/test_<area>.py`.
+399 tests (2 skipped) cover the scanner, safety rules, deletion (protected paths, iterative traversal), the CLI (EOF handling, drill-down, cancellation announcement), exports (localization + v2 determinism and cancelled-markers), the API (state, root protection, cancellation), recommendation/composition, locale parity, knowledge-base cache parity, web-asset audits, and the desktop UI (headless via `QT_QPA_PLATFORM=offscreen`: drill-down I10 gates, evicted notice, reasons panel, export dialog, settings persistence, live EN/ES re-localization, artifact self-test). A committed scripted E2E harness (`e2e/`, Phase 12) verifies cross-surface parity — CLI EN/ES subprocesses, Web `TestClient`, Desktop offscreen Qt, **byte-identical JSON export across the three surfaces**, live re-localization on source and on the frozen exe, a frozen-artifact UI Automation session, and the artifact `--selftest` (34/34 checks). Run individual files with `pytest tests/test_<area>.py`.
 
 ## Dependencies
 
