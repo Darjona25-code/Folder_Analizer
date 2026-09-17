@@ -34,6 +34,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deviation — engine remains frozen); perf smoke vs Phase 8 baseline within
   the +20% gate (alloc 0.26 MiB / 7,400 retained @ 0.00%; warm t_scan mean
   +7.8%, KB dispatch ≤ +16.4%, export ≤ +8.9%).
+- **TASK 5B nested-only regression lock (`f6a06a8`, pushed) + TASK 8 doc
+  reconciliation.** `tests/test_scanner.py::test_scanner_nested_only_folder_stays_review_first`
+  runs a REAL scanner pass on a nested-only folder and asserts the PARENT
+  (0 direct bytes → empty direct composition) → REVIEW_FIRST /
+  `r6_review_first` while the disposable CHILD (direct `.tmp` files) →
+  SAFE_TO_DELETE / `r5_safe_to_delete` — the previously probe-only nested-only
+  behavior (`C:\fa_phase12_5b`) is now locked by a committed regression test,
+  not just documented prose (ROADMAP §11 / SAFETY.md §11). CHANGELOG /
+  SESSION.md / docs/ROADMAP.md reconciled so the suite count at the Phase-12
+  close reads **400 passed / 2 skipped** wherever stated as current state;
+  historical point-in-time counts are preserved as recorded facts (baseline 399
+  at `d283730`, post-E2E 399 at `bfeb177`, Phase 11 close 399, wheel close 398).
 - **No git tag yet.** The single `v3.0.0` tag is applied ONLY when the user
   gives written acceptance of Phase 12 (§18 sequencing stays intact).
 

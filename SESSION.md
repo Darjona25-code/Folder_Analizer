@@ -188,7 +188,23 @@ A disk space analyzer with two front-ends:
   (the archival Phase 6–8 figures 59,862 / 7,509 / 30,081 no longer match the
   re-measured fixture content and are superseded by the re-measurement; the
   earlier "html 30,281 B" line was not reproducible). **Verdict: PASS within gate.**
-- **Status:** IN PROGRESS — TASKS 1–8 executed with raw evidence. NOT
+- **TASK 5B - nested-only regression lock (`f6a06a8`, pushed).**
+  `tests/test_scanner.py::test_scanner_nested_only_folder_stays_review_first`
+  runs a real scanner pass on a nested-only folder: parent 0 direct bytes
+  (empty direct composition) → **REVIEW_FIRST / `r6_review_first`**;
+  disposable child (direct `.tmp`) → **SAFE_TO_DELETE / `r5_safe_to_delete`**.
+  Suite 399 → **400 passed / 2 skipped**. The previously probe-only nested-only
+  behavior (`C:\fa_phase12_5b`) is now LOCKED by this committed regression
+  test, not just documented prose.
+- **TASK 8 - doc reconciliation (docs commit, pushed).** CHANGELOG.md /
+  SESSION.md / docs/ROADMAP.md updated for commit `f6a06a8` and the suite
+  count at the Phase-12 close 399 → **400 passed / 2 skipped** everywhere it
+  is stated as current state (historical point-in-time counts preserved as
+  recorded facts).
+- **TASK 9 - final full suite at the true final HEAD (after the TASK 8 doc
+  commit lands):** full raw output recorded in the phase record —
+  **400 passed / 2 skipped**; HEAD hash confirmed; working tree clean.
+- **Status:** IN PROGRESS — TASKS 1–9 executed with raw evidence. NOT
   delivered/approved; awaiting the user's written acceptance after TASK 10;
   **no `v3.0.0` tag created.**
 
@@ -201,7 +217,7 @@ Root-folder exclusion and scan-root deletion protection (CLI + API), clean EOF h
 - Python 3.10+ (tested on 3.12)
 - Rich (terminal UI), send2trash (Recycle Bin), psutil (disk info)
 - FastAPI + Uvicorn (web), httpx (API testing)
-- pytest — 399 tests passing (2 skipped) at Phase 11/12 close (398 in the wheel close, 397 at Phase 10 close)
+- pytest — 400 tests passing (2 skipped) at Phase 12 close (TASK 9; 399 at Phase 11 close, 398 in the wheel close, 397 at Phase 10 close)
 
 ### To continue development
 
