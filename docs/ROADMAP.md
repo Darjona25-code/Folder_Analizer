@@ -257,6 +257,18 @@ unresolvable descendant ⇒ non-zero UNKNOWN share ⇒ R3 ⇒ folder ≤ REVIEW_
 percentages are over total descendant bytes only. A 0-total-byte tree is resolved by
 direct folder assessment (empty + positive direct evidence ⇒ SAFE; otherwise REVIEW_FIRST).
 
+**Nested-only folders (TASK 5B confirmed):** the per-folder assessment is derived
+from the folder's **DIRECT** bytes only (`scanner.py` builds `FolderAggregation.composition`
+from direct bytes and calls `derive_folder_recommendation(None, composition)`), while
+exports/UI display the full **recursive** fold. A folder with ZERO direct bytes (all
+content in subfolders) therefore has an empty direct composition and hits the
+0-total-byte branch → **REVIEW_FIRST (r6) EVEN when its recursive composition is 100%
+DISPOSABLE** — R5 requires positive direct disposable evidence, which a nested-only
+folder structurally lacks (by design, not a defect). Probe evidence 2026-09-17
+(`C:\fa_phase12_5b`): root + `Data` nested-only (0 direct / recursive 12 B 100%
+DISPOSABLE) → r6 REVIEW_FIRST; `Data\scratch` with direct `.tmp/.log/.bak` → r5
+SAFE/HIGH.
+
 **Rules (initial heuristic thresholds, subject to validation, implemented as named
 configurable constants):**
 

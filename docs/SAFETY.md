@@ -321,6 +321,13 @@ deletion security):
 - Composition thresholds (`SAFE_MIN_SHARE` 0.85 / `KNOWN_NON_DISPOSABLE_CEILING`
   0.10 / `REVIEW_SHARE` 0.15 / `UNKNOWN_BLOCK` 0.0, per `docs/ROADMAP.md §5`) as
   named constants in `CompositionConfig`.
+- **Nested-only folder behavior (Phase 12 TASK 5B, confirmed 2026-09-17):** a
+  folder with 0 direct bytes (all its content lives in subfolders) is assessed
+  on the empty DIRECT composition via the zero-byte-tree branch → REVIEW_FIRST
+  (r6) even when its recursive composition is 100% DISPOSABLE, because R5
+  requires positive direct disposable evidence. This is by design, not a
+  defect: the folder-as-a-whole action stays gated, while the disposable
+  child (with direct DISPOSABLE bytes) remains independently SAFe.
 
 Scan-time `NOT_RESOLVABLE` surfacing (confidence flagging, "cannot be validated"
 status in scan output) is deliberately **NOT implemented in Phases 1–3**: Phase 3
