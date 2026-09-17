@@ -18,7 +18,7 @@ A disk space analyzer that scans any drive or folder, reports folder sizes, and 
 - **Bilingual** — Full English and Spanish support (CLI `--lang en`/`es`, API `lang` parameter, localized exports, desktop settings)
 - **Drill-down + reasons** — Desktop opens per-folder retained files with per-file gates and a read-only details panel
 - **Scan cancellation** — CLI/API scans stop on request and are explicitly marked PARTIAL, never presented as silently complete
-- **Cross-surface E2E parity** — committed `e2e/` harness verifies CLI/Web/Desktop equivalence (byte-identical JSON exports) plus the frozen desktop artifact via UI Automation and `--selftest` (Phase 12)
+- **Cross-surface E2E parity** — committed `e2e/` harness verifies CLI/Web/Desktop equivalence (payload-equal JSON exports modulo the volatile `scan_date`) plus the frozen desktop artifact via UI Automation and `--selftest` (Phase 12)
 
 ## Installation
 
@@ -224,7 +224,7 @@ pip install pytest
 pytest tests/
 ```
 
-399 tests (2 skipped) cover the scanner, safety rules, deletion (protected paths, iterative traversal), the CLI (EOF handling, drill-down, cancellation announcement), exports (localization + v2 determinism and cancelled-markers), the API (state, root protection, cancellation), recommendation/composition, locale parity, knowledge-base cache parity, web-asset audits, and the desktop UI (headless via `QT_QPA_PLATFORM=offscreen`: drill-down I10 gates, evicted notice, reasons panel, export dialog, settings persistence, live EN/ES re-localization, artifact self-test). A committed scripted E2E harness (`e2e/`, Phase 12) verifies cross-surface parity — CLI EN/ES subprocesses, Web `TestClient`, Desktop offscreen Qt, **byte-identical JSON export across the three surfaces**, live re-localization on source and on the frozen exe, a frozen-artifact UI Automation session, and the artifact `--selftest` (34/34 checks). Run individual files with `pytest tests/test_<area>.py`.
+399 tests (2 skipped) cover the scanner, safety rules, deletion (protected paths, iterative traversal), the CLI (EOF handling, drill-down, cancellation announcement), exports (localization + v2 determinism and cancelled-markers), the API (state, root protection, cancellation), recommendation/composition, locale parity, knowledge-base cache parity, web-asset audits, and the desktop UI (headless via `QT_QPA_PLATFORM=offscreen`: drill-down I10 gates, evicted notice, reasons panel, export dialog, settings persistence, live EN/ES re-localization, artifact self-test). A committed scripted E2E harness (`e2e/`, Phase 12) verifies cross-surface parity — CLI EN/ES subprocesses, Web `TestClient`, Desktop offscreen Qt, **JSON export content-parity across the three surfaces (payload-equal modulo the volatile `scan_date`; the raw files are not byte-identical)**, live re-localization on source and on the frozen exe, a frozen-artifact UI Automation session, and the artifact `--selftest` (34/34 checks). Run individual files with `pytest tests/test_<area>.py`.
 
 ## Dependencies
 

@@ -126,19 +126,32 @@ A disk space analyzer with two front-ends:
   CLI EN+ES subprocess (scan/exports/gated delete: SAFE cache deletable,
   REVIEW row deletable, scan root blocked), Web TestClient parity (root
   blocked, drill-down gating), Desktop offscreen Qt (rows, i18n, drill, gated
-  delete), **JSON export byte-identical across CLI/Web/Desktop**, live
+  delete), **JSON export content-parity across CLI/Web/Desktop (payload-equal
+  after dropping the volatile `scan_date`; the raw export FILES are NOT
+  byte-identical — measured SHA1s differ: cli_en `c78c9fc9…`, cli_es
+  `79ce6618…`, web `948b2c86…`)**, live
   EN/ES/EN on source + frozen exe, frozen artifact UIA (ValuePattern path set,
   Scan clicked, grid cell text readable → rows matched source), artifact
   `--selftest` all-pass (3.0.0, locales 127/127, I10 gates, guard blocks
   invalid, guard send2trash deletes real). COM teardown crash avoided by
-  printing verdict + `os._exit(0)` + `taskkill /F`.
+  printing verdict + `os._exit(0)` + `taskkill /F`. NOTE (F1 re-check): the
+  frozen-UIA grid readback is FLAKY — native faults reproduced on
+  2026-09-17 with `0xC0000374` (STATUS_HEAP_CORRUPTION) and `0xC0000005`
+  (ACCESS_VIOLATION) on consecutive runs, then a full PASS (EXIT 0, verdicts
+  matching source) on the following run; `--selftest` always passes 11/11.
 - **TASK 3 - stability + i18n completeness.** Full suite after TASK 2 STILL
-  **399 passed / 2 skipped** (6.36 s); locale-focused run 48 passed;
+  **399 passed / 2 skipped** (6.36 s); locale-focused selection reproduces
+  **23 passed** (`pytest tests/ -k "locale or i18n"`) or **45 passed**
+  (`pytest tests/test_i18n.py tests/test_locales.py tests/test_web_assets.py
+  tests/test_desktop_controller.py tests/test_desktop_smoke.py`); the earlier
+  "48 passed" line is only reproducible via the 7-file locale set (locales+
+  i18n+explain+live_relocal+web_assets+folder_composition+i10);
   `UI_KEYS en=127 es=127 symmetric=True`; `REASON_KEYS en=22 es=22
   symmetric=True`.
 - **TASK 4 - export round-trip.** schema=2; root `C:\fa_e2e_phase12`; 9
   files/6 folders; 7 scan paths present; CSV 13 cols/6 rows with cache row
-  `safe_to_delete/high` correct; HTML 6991 B contains paths+reasons;
+  `safe_to_delete/high` correct; HTML **7176 B** (identical to the saved
+  `task4/report.html`) contains paths+reasons;
   csv⊆json set parity True; **JSON determinism sha1 `3f8bc7fd…`** with fixed
   `scan_date`. Disposable probe (temp) removed in TASK 6.
 - **TASK 5 - threshold revalidation on REAL folders (engine frozen).**
@@ -169,10 +182,12 @@ A disk space analyzer with two front-ends:
   export t_scan 0.3865 s warm (+8.9%) / 0.4088 s cold (+15.2%); **gate alloc
   0.26 MiB and retained 7,400 @ 0.00% (exact)**; RSS envelope 16.2–17.8 MiB
   (informational). First run 0.609 s was a cold page-cache artifact after
-  fixture regeneration (warm runs within gate). Export bytes: json 59,862 /
-  csv 7,509 byte-identical to P8; html 30,281 B (P8 recorded 30,081 B;
-  exporter.py untouched since `552625b` — HTML embeds i18n strings; noted as
-  non-gate observation). **Verdict: PASS within gate.**
+  fixture regeneration (warm runs within gate). Export bytes (Phase 12
+  re-measurement, `head_export.log` / `p8_export.log` / saved reports):
+  **json 61,040 / csv 8,517 / html 31,317 B byte-identical head-vs-P8**
+  (the archival Phase 6–8 figures 59,862 / 7,509 / 30,081 no longer match the
+  re-measured fixture content and are superseded by the re-measurement; the
+  earlier "html 30,281 B" line was not reproducible). **Verdict: PASS within gate.**
 - **Status:** IN PROGRESS — TASKS 1–8 executed with raw evidence. NOT
   delivered/approved; awaiting the user's written acceptance after TASK 10;
   **no `v3.0.0` tag created.**
