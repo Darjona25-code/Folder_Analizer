@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added (2026-09-16 — Phase 11 Packaging & Installer)
 
+- **Phase 11 ACCEPTED AND CLOSED (2026-09-16)** — user's written acceptance.
+  All residual items closed with raw evidence: 1–4 (`65e16d7`, `3b55587`,
+  `787525a`) and L2 live re-localization, verified at artifact level plus a
+  committed regression test (`6e39d96`, `6c780fa`). Suite at close: 399
+  passed, 2 skipped. Engine untouched (empty diff vs `cb9afd3`).
 - **Version 3.0.0 (R6).** `pyproject.toml`, `folder_analyzer/__init__.py` and
   `api/main.py` now declare `3.0.0`. **Deliberate version-ahead-of-tag
   sequencing, per ROADMAP §18:** the *string* is 3.0.0 while **no `v3.0.0` git

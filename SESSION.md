@@ -58,7 +58,7 @@ A disk space analyzer with two front-ends:
   one-off artifacts, integrity commitment given in writing. Phase 9 status:
   superseded by the approved Phase 10.
 
-### Phase 11 — Packaging & Installer (DELIVERED 2026-09-16, awaiting acceptance)
+### Phase 11 — Packaging & Installer (CLOSED / APPROVED 2026-09-16)
 
 - **PyInstaller onedir bundle of the desktop app only** (R1: CLI packaging and
   the wheel/entry-point mechanism untouched). `packaging/FolderAnalyzer.spec`:
@@ -109,7 +109,10 @@ A disk space analyzer with two front-ends:
   the phase close is EMPTY.
 - **Commits:** `c54efb3` (version 3.0.0 + locale package-data) → `c37fa63`
   (artifact self-test) → `e641116` (PyInstaller spec + Inno Setup script +
-  build_desktop.ps1) → `docs(pkg)` close. Awaits explicit written acceptance.
+  build_desktop.ps1) → `docs(pkg)` close (`65e16d7`, `3b55587`, `787525a` →
+  `6e39d96` → `6c780fa` → `5f197d8`). **ACCEPTED AND CLOSED by the user's
+  written acceptance (2026-09-16)** — all residual items 1–4 and L2 closed
+  with raw evidence; suite 399 passed / 2 skipped at close; engine frozen.
 
 ### Recent repairs (12 issues)
 
