@@ -7,8 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added (2026-09-16 — Phase 12 Final Integration, IN PROGRESS; not yet delivered)
+### Added (2026-09-16 — Phase 12 Final Integration; closed on the user's written acceptance 2026-09-18)
 
+- **Phase 12 COMPLETE / APPROVED + TASK 10 CLOSED (2026-09-18) — the user's
+  written acceptance.** The TASK 10 gate was met: the full raw evidence package
+  (TASKS 1–9 raw evidence, the final suite green at the README-reconciled HEAD,
+  the STOP statement, and the `c7e4195` origin investigation backed by the
+  verbatim user prompt recorded in the opencode session store) was presented,
+  and the user instructed the closure of TASK 10 and the phase. Final suite
+  re-verified green at the close HEAD (**400 passed / 2 skipped**). Phase 12
+  moved from DELIVERED — awaiting written acceptance to **COMPLETE /
+  APPROVED**; the single `v3.0.0` tag was applied at the closure commit
+  (2026-09-18, §18/§22 sequencing intact). Engine remains frozen.
 - **Committed scripted E2E harness (`bfeb177`).** `e2e/e2e_common.py`,
   `e2e/run_e2e.py` and `e2e/frozen_ui_e2e.py` run against a throwaway tree
   (`C:\fa_e2e_phase12`, rebuilt before each surface) and the frozen artifact:
@@ -66,8 +76,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into a new `docs_spanish/` folder: `docs_spanish/HANDOFF-2026-09-10-ES.md` and
   `docs_spanish/session-export-phase3-sanitized.json` (both previously under
   `session/`); the Spanish pointers in `SESSION.md` were translated to English.
-- **No git tag yet.** The single `v3.0.0` tag is applied ONLY when the user
-  gives written acceptance of Phase 12 (§18 sequencing stays intact).
+- **`v3.0.0` tag applied (2026-09-18).** The single `v3.0.0` tag was created on
+  top of the Phase 12 closure commit — applied ONLY after the user's written
+  acceptance of Phase 12 (§18/§22 sequencing stays intact).
 
 ### Added (2026-09-16 — Phase 11 Packaging & Installer)
 

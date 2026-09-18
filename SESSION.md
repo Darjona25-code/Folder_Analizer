@@ -115,8 +115,16 @@ A disk space analyzer with two front-ends:
   written acceptance (2026-09-16)** — all residual items 1–4 and L2 closed
   with raw evidence; suite 399 passed / 2 skipped at close; engine frozen.
 
-### Phase 12 - Final Integration, QA & Portfolio Cleanup (IN PROGRESS 2026-09-16; NOT yet delivered/approved)
+### Phase 12 - Final Integration, QA & Portfolio Cleanup (COMPLETE / APPROVED 2026-09-18 — user's written acceptance)
 
+- **TASK 10 CLOSED + Phase 12 COMPLETE / APPROVED (2026-09-18).** The user gave
+  the written acceptance to close this phase and TASK 10 in this session
+  ("dar por terminada esta fase y task 10"). TASK 10 evidence (the `c7e4195`
+  origin investigation, validated against the opencode session store, reflog
+  and git objects) was reviewed; final suite re-verified green at the close
+  HEAD (**400 passed / 2 skipped**); the single `v3.0.0` tag was applied at the
+  closure commit (2026-09-18, per §18/§22). Engine remains frozen. The
+  IN-PROGRESS bullets below are preserved verbatim as point-in-time history.
 - **Go-ahead:** the user issued the 10-task evidence brief (2026-09-16); strict sequential execution, raw evidence per task, no tag, STOP at TASK 10.
 - **TASK 1 - baseline.** Full suite at HEAD `d283730`: **399 passed / 2 skipped / 2 warnings in 10.40 s** (matches the Phase 11 close).
 - **TASK 2 - committed E2E harness (`bfeb177`, pushed).** `e2e/e2e_common.py`,
@@ -224,10 +232,11 @@ A disk space analyzer with two front-ends:
   and `docs_spanish/session-export-phase3-sanitized.json` (was
   `session/session-export-phase3-sanitized.json`). The Spanish header/handoff
   pointers in this file were translated to English.
-- **Status:** IN PROGRESS — TASKS 1–9 executed with raw evidence; **TASK 9
-  CLOSED (2026-09-17)**; TASK 10 evidence under the user's review. NOT
-  delivered/approved as a phase; awaiting the user's written acceptance after
-  TASK 10; **no `v3.0.0` tag created.**
+- **Status:** **COMPLETE / APPROVED (2026-09-18)** — TASKS 1–10 executed with
+  raw evidence; **TASK 9 CLOSED (2026-09-17)**; **TASK 10 CLOSED + Phase 12
+  APPROVED on the user's written acceptance (2026-09-18)**; final suite 400
+  passed / 2 skipped at the close HEAD; **`v3.0.0` tag applied (2026-09-18)**.
+  Engine frozen throughout Phase 12 (empty engine diff across the phase).
 
 ### Recent repairs (12 issues)
 
