@@ -30,3 +30,7 @@ deletion_audit.jsonl
 benchmarks/generated/
 benchmarks/results/
 e2e/out/
+.pytest_cache/
+archive/benchmarks/generated/
+archive/benchmarks/results/
+archive/release/

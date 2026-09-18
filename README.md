@@ -199,7 +199,8 @@ Folder_Analizer/
 │   └── selftest.py            # `--selftest` artifact verification (Phase 11)
 ├── packaging/                 # Phase 11: PyInstaller spec + Inno Setup script
 ├── e2e/                       # Phase 12: scripted E2E harness (CLI/Web/Desktop + frozen artifact)
-├── tests/                     # 399 unit + integration tests (2 skipped)
+├── tests/                     # 400 unit + integration tests (2 skipped)
+├── archive/                   # Non-active material (benchmarks, release installer)
 ├── api/                       # FastAPI backend (Web UI)
 │   ├── main.py                # App + static file mounting + entry point
 │   ├── routes.py              # REST endpoints
