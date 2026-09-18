@@ -4,10 +4,11 @@ If you need to continue this development session on another PC, open opencode an
 
 **Link:** https://opncd.ai/share/a8LeCjC2
 
-> **Handoff completo (2026-09-10, fin de Phase 3):** lee `session/HANDOFF-2026-09-10-ES.md`
-> para el estado íntegro y las instrucciones. Para restaurar la conversación completa:
-> `opencode import session\session-export-phase3-sanitized.json`
-> (export sanitizado con `opencode export <sessionId> --sanitize`).
+> **Full handoff (2026-09-10, end of Phase 3, Spanish):** read
+> `docs_spanish/HANDOFF-2026-09-10-ES.md` for the complete state and the
+> instructions. To restore the full conversation:
+> `opencode import docs_spanish\session-export-phase3-sanitized.json`
+> (sanitized export via `opencode export <sessionId> --sanitize`).
 
 ## Session Summary
 
@@ -210,9 +211,23 @@ A disk space analyzer with two front-ends:
   2 skipped) and the TASK 8/9/10 evidence PDFs (raw, verbatim, no summary)
   delivered to `C:\Users\Flaptop2\Documents`. Phase 12 remains **IN PROGRESS —
   awaiting the user's written acceptance after TASK 10**; no `v3.0.0` tag.
-- **Status:** IN PROGRESS — TASKS 1–9 executed with raw evidence. NOT
-  delivered/approved; awaiting the user's written acceptance after TASK 10;
+- **TASK 9 CLOSED (user's written acceptance, 2026-09-17).** The user accepted
+  TASK 9 ("task 9 la podemos cerrar"); its final-suite evidence (400 passed /
+  2 skipped) is accepted as closed. TASK 10 evidence is under the user's review;
+  work is paused awaiting the user's commands. Phase 12 as a whole remains
+  **IN PROGRESS — DELIVERED, awaiting the user's written acceptance (TASK 10)**;
   **no `v3.0.0` tag created.**
+- **Repo English-only policy; Spanish informational docs relocated (2026-09-17).**
+  Per the user's instruction, everything on GitHub is English. The Spanish
+  informational session documents were moved into `docs_spanish/`:
+  `docs_spanish/HANDOFF-2026-09-10-ES.md` (was `session/HANDOFF-2026-09-10-ES.md`)
+  and `docs_spanish/session-export-phase3-sanitized.json` (was
+  `session/session-export-phase3-sanitized.json`). The Spanish header/handoff
+  pointers in this file were translated to English.
+- **Status:** IN PROGRESS — TASKS 1–9 executed with raw evidence; **TASK 9
+  CLOSED (2026-09-17)**; TASK 10 evidence under the user's review. NOT
+  delivered/approved as a phase; awaiting the user's written acceptance after
+  TASK 10; **no `v3.0.0` tag created.**
 
 ### Recent repairs (12 issues)
 
@@ -619,7 +634,7 @@ any other engine change out of bounds. Zero behavior change to outputs.
   (API `ScanResponse.cancelled`, CLI PARTIAL notice, additive export markers,
   web UI localized notice) — see CHANGELOG correction entry.
 
-## Actualización (2026-09-15) — evidence gap closed + pre-next-phase doc refresh
+## Update (2026-09-15) — evidence gap closed + pre-next-phase doc refresh
 
 - **Evidence gap closed:** the three blocker test bodies and the corrected doc
   text (ARCHITECTURE §6c, CHANGELOG correction entry, SESSION corrections,

@@ -40,7 +40,7 @@ Y darle contexto con **cualquiera de las dos opciones** siguientes (o ambas):
 
 ```bash
 # Desde el repo clonado, importa la sesión exportada:
-opencode import session\session-export-phase3-sanitized.json
+opencode import docs_spanish\session-export-phase3-sanitized.json
 ```
 
 Esto reconstruye la conversación de la sesión (mensajes, herramientas, resultados) y
@@ -51,7 +51,7 @@ opencode continúa con todo el contexto previo.
 Abrir opencode y pedir:
 
 ```text
-Lee el archivo session/HANDOFF-2026-09-10-ES.md y resúmelo.
+Lee el archivo docs_spanish/HANDOFF-2026-09-10-ES.md y resúmelo.
 Luego lee docs/SESSION.md, docs/ROADMAP.md, CHANGELOG.md y docs/SAFETY.md.
 Estado actual: Phases 1-3 completas. Siguiente fase: Phase 4 (Knowledge Base).
 ```

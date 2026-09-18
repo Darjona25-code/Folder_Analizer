@@ -55,6 +55,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the TASK 10 STOP statement and evidence package, and the `git show` hunks
   (`8553999`, `7309289`) were packaged as verbatim evidence (TASK 9/10 final
   evidence plus the TASK 8/9/10 evidence PDFs) in the user's Documents folder.
+- **TASK 9 CLOSED on the user's written acceptance (2026-09-17).** The user
+  accepted TASK 9; its final-suite evidence (400 passed / 2 skipped) is closed.
+  TASK 10 evidence is under the user's review — work is paused awaiting the
+  user's commands. Phase 12 as a whole remains **IN PROGRESS / DELIVERED,
+  awaiting the user's written acceptance (TASK 10)**.
+- **Repository is English-only; Spanish informational docs relocated
+  (`docs_spanish/`, 2026-09-17).** Per the user's instruction, all GitHub
+  content is in English. The Spanish informational session documents were moved
+  into a new `docs_spanish/` folder: `docs_spanish/HANDOFF-2026-09-10-ES.md` and
+  `docs_spanish/session-export-phase3-sanitized.json` (both previously under
+  `session/`); the Spanish pointers in `SESSION.md` were translated to English.
 - **No git tag yet.** The single `v3.0.0` tag is applied ONLY when the user
   gives written acceptance of Phase 12 (§18 sequencing stays intact).
 
